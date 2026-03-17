@@ -1,0 +1,63 @@
+"""
+locataire_routes.py - Routes API gestion Locataires
+
+Description:
+Endpoints CRUD pour les locataires.
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+from app.schemas.locataire_schema import LocataireCreate, LocataireUpdate, LocataireResponse
+from app.services.patrimoine_service import PatrimoineService
+from app.utils.db import get_db
+
+router = APIRouter(prefix="/api/locataires", tags=["Locataires"])
+
+
+@router.get("/", response_model=List[LocataireResponse])
+def get_all_locataires(db: Session = Depends(get_db)):
+    service = PatrimoineService(db)
+    return service.get_all_locataires()
+
+
+@router.get("/{locataire_id}", response_model=LocataireResponse)
+def get_locataire(locataire_id: int, db: Session = Depends(get_db)):
+    service = PatrimoineService(db)
+    locataire = service.get_locataire_by_id(locataire_id)
+    if not locataire:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Locataire avec ID {locataire_id} introuvable"
+        )
+    return locataire
+
+
+@router.post("/", response_model=LocataireResponse, status_code=status.HTTP_201_CREATED)
+def create_locataire(locataire_data: LocataireCreate, db: Session = Depends(get_db)):
+    service = PatrimoineService(db)
+    return service.create_locataire(locataire_data)
+
+
+@router.put("/{locataire_id}", response_model=LocataireResponse)
+def update_locataire(locataire_id: int, locataire_data: LocataireUpdate, db: Session = Depends(get_db)):
+    service = PatrimoineService(db)
+    locataire = service.update_locataire(locataire_id, locataire_data)
+    if not locataire:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Locataire avec ID {locataire_id} introuvable"
+        )
+    return locataire
+
+
+@router.delete("/{locataire_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_locataire(locataire_id: int, db: Session = Depends(get_db)):
+    service = PatrimoineService(db)
+    success = service.delete_locataire(locataire_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Locataire avec ID {locataire_id} introuvable"
+        )
+    return None
