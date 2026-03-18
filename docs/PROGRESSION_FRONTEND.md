@@ -1,162 +1,160 @@
 # Progression Frontend - Meziane Monitoring
 
-**Dernière mise à jour : 16 mars 2026**
+**Dernière mise à jour : 17 mars 2026**
 
 ---
 
-## 📊 État Global
+## État Global
 
-**Phase actuelle :** Phase 0 - Planification
-**Avancement global :** 0% (0/5 phases)
+**Phase actuelle :** Phase 1 - Setup + Dashboard statique
+
+**Avancement global :** 32%
+
+**Synthèse :**
+- Le dossier `frontend/` existe et compile.
+- Le dashboard Bloomberg mocké est en place.
+- La base de navigation `login / dashboard / agents / admin` est posée.
+- La prochaine vraie tranche est l'intégration API.
 
 ---
 
-## ✅ Phase 0 : Planification (TERMINÉ)
+## Phase 0 : Planification
 
-**Durée :** 1 jour
 **Statut :** ✅ Complété
 
-### Tâches réalisées
-- [x] Création FRONTEND_ARCHITECTURE.md
-- [x] Définition stack technique
-- [x] Définition 4 pages (Login, Dashboard, Agents, Admin)
-- [x] Layout dashboard Bloomberg (12 widgets)
-- [x] Structure dossiers frontend
-- [x] Design system (couleurs, typo, spacing)
-- [x] Roadmap 5 phases
+### Réalisé
+- [x] Création et révision de `FRONTEND_ARCHITECTURE.md`
+- [x] Définition de la vision produit et du layout dashboard
+- [x] Roadmap frontend en 5 phases
 
 ---
 
-## 🚧 Phase 1 : Setup + Dashboard Statique
+## Phase 1 : Setup + Dashboard Statique
 
-**Durée estimée :** 3 jours
-**Statut :** ⏳ À faire
-**Avancement :** 0% (0/8 tâches)
+**Statut :** 🚧 En cours de finalisation
 
-### Tâches
-- [ ] Init projet Next.js 14 + TypeScript
-- [ ] Setup TailwindCSS + configuration dark/light mode
-- [ ] Installation shadcn/ui + composants de base
-- [ ] Création layout (Sidebar + Header + ThemeToggle)
-- [ ] Création 12 widgets avec mock data
-  - [ ] 4 KPI Cards (Patrimoine, Cashflow, Alertes, Performance)
-  - [ ] 2 Charts (CashflowChart, PatrimoineChart)
-  - [ ] TransactionsTable
-  - [ ] Top5Biens cards
-  - [ ] SCIOverview (6 mini-cards)
-  - [ ] LocatairesCards
-  - [ ] SimulationForm
-  - [ ] OpportunitesWidget
-- [ ] Page dashboard avec grid layout Bloomberg
-- [ ] Design system complet (couleurs, fonts, spacing)
-- [ ] Tests visuels responsive
+**Avancement :** 86% (6/7 tâches)
 
-**Blocages :** Aucun
+### Réalisé
+- [x] Init du projet `frontend` avec Next.js + TypeScript
+- [x] Setup TailwindCSS 4 + design tokens dark/light
+- [x] Mise en place du store Zustand pour thème et sidebar
+- [x] Création du layout principal `Sidebar + Header + ThemeToggle`
+- [x] Création du dashboard statique avec 12 widgets mockés
+- [x] Création des pages de base `/login`, `/agents`, `/admin`
+- [x] Vérification `npm run lint`
+- [x] Vérification build avec `npx next build --webpack`
 
----
+### À finir sur cette phase
+- [ ] QA visuelle responsive complète sur mobile et desktop réel
 
-## ⏸️ Phase 2 : Intégration API
+### Widgets livrés
+- [x] 4 KPI Cards
+- [x] CashflowChart
+- [x] PatrimoineChart
+- [x] TransactionsTable
+- [x] TopBiensList
+- [x] SCIOverviewGrid
+- [x] LocatairesList
+- [x] SimulationPanel
+- [x] OpportunitesList
 
-**Durée estimée :** 3 jours
-**Statut :** ⏸️ En attente
-**Avancement :** 0% (0/6 tâches)
-
-### Tâches
-- [ ] Configuration API client (axios + JWT interceptor)
-- [ ] Setup React Query
-- [ ] Création hooks API (useCashflow, usePatrimoine, useTransactions)
-- [ ] Connexion widgets dashboard aux vraies données backend
-- [ ] Page Login fonctionnelle (POST /api/auth/login)
-- [ ] Protected routes + redirection si non auth
-
-**Dépendances :** Backend API (routes cashflow, patrimoine, transactions)
+### Blocages
+- `next build` par défaut passe par Turbopack et peut échouer en sandbox sur une contrainte d'environnement.
+- Le contournement de vérification fiable est `npx next build --webpack`.
 
 ---
 
-## ⏸️ Phase 3 : Pages Admin + Agents
+## Phase 2 : Intégration API
 
-**Durée estimée :** 3 jours
-**Statut :** ⏸️ En attente
-**Avancement :** 0% (0/7 tâches)
+**Statut :** ⏸️ Prête à démarrer
 
-### Tâches
-- [ ] Page Admin Biens (DataTable + Modal create/edit)
-- [ ] Page Admin SCI (DataTable + Modal create/edit)
-- [ ] Page Admin Locataires (DataTable + Modal create/edit)
-- [ ] Page Admin Analytics (stats clics/partage)
-- [ ] Page Agents (liste agents IA)
-- [ ] Page Config Agent (/agents/[id])
-- [ ] Page Créer Agent (/agents/new)
-
-**Dépendances :** Backend API (routes biens, sci, locataires, agents)
-
----
-
-## ⏸️ Phase 4 : Real-Time
-
-**Durée estimée :** 2 jours
-**Statut :** ⏸️ En attente
-**Avancement :** 0% (0/4 tâches)
-
-### Tâches
-- [ ] Hook useRealTime (WebSocket connection)
-- [ ] Écoute événements backend (TRANSACTION_CREATED, CASHFLOW_UPDATED, etc.)
-- [ ] Auto-invalidation cache React Query
-- [ ] Toast notifications (nouvelles transactions, alertes agents)
-
-**Dépendances :** Backend WebSocket endpoint
-
----
-
-## ⏸️ Phase 5 : Optimisations
-
-**Durée estimée :** 2 jours
-**Statut :** ⏸️ En attente
 **Avancement :** 0% (0/5 tâches)
 
 ### Tâches
-- [ ] Virtualisation tables (react-virtual)
-- [ ] Lazy loading composants lourds
-- [ ] Responsive mobile (sidebar collapse, grid adaptatif)
-- [ ] Tests E2E (Playwright)
-- [ ] Optimisations performances (Lighthouse score >90)
+- [ ] Créer `frontend/src/lib/api/client.ts` avec interceptor JWT
+- [ ] Créer un hook `useDashboard` branché sur `GET /api/dashboard/full`
+- [ ] Remplacer les mocks dashboard par les données backend
+- [ ] Brancher la page `/login` sur l'auth backend
+- [ ] Ajouter les redirections et guards d'auth
 
-**Dépendances :** Phases 1-4 terminées
-
----
-
-## 🐛 Bugs Connus
-
-Aucun (projet non démarré)
+**Dépendances :** API backend disponible sur `http://localhost:8000`
 
 ---
 
-## 📝 Notes & Décisions
+## Phase 3 : Pages Admin + Agents
 
-### Décisions Techniques
-- **Framework :** Next.js 14 (App Router) choisi pour SSR + performance
-- **State Management :** React Query (server state) + Zustand (UI state)
-- **Real-Time :** WebSocket natif (pas Socket.io, YAGNI)
-- **Charts :** Recharts (simplicité) plutôt que D3.js (overkill pour MVP)
-- **Forms :** React Hook Form + Zod (validation)
+**Statut :** ⏸️ En attente
 
-### À Valider avec Bilal
-- [ ] Palette couleurs dark theme (bg-slate-950 ok ?)
-- [ ] Nombre de widgets dashboard (12 suffisant ou plus ?)
-- [ ] Mobile responsive prioritaire ou desktop-first ?
+**Avancement :** 10%
 
----
+### Déjà posé
+- [x] Entrées de navigation `/agents` et `/admin`
+- [x] Pages placeholders intégrées au shell
 
-## 🎯 Prochaine Action
-
-**Démarrer Phase 1 :** Init Next.js 14 + setup TailwindCSS + shadcn/ui
-
-**Commande :**
-```bash
-cd /Users/bilalmeziane/Desktop/Meziane_Monitoring
-npx create-next-app@latest frontend --typescript --tailwind --app
-```
+### À faire
+- [ ] CRUD Biens
+- [ ] CRUD SCI
+- [ ] CRUD Locataires
+- [ ] Page Analytics
+- [ ] Liste agents IA
+- [ ] Config agent
+- [ ] Création agent
 
 ---
 
-**FIN - Version 1.0**
+## Phase 4 : Real-Time
+
+**Statut :** ⏸️ En attente
+
+**Avancement :** 0%
+
+### Tâches
+- [ ] Hook `useRealTime`
+- [ ] Écoute des événements backend
+- [ ] Refresh dashboard sur événements
+- [ ] Notifications toast
+
+---
+
+## Phase 5 : Optimisations
+
+**Statut :** ⏸️ En attente
+
+**Avancement :** 0%
+
+### Tâches
+- [ ] Virtualisation des tables
+- [ ] Lazy loading des composants lourds
+- [ ] Responsive mobile finalisé
+- [ ] Tests E2E
+- [ ] Optimisation performance Lighthouse
+
+---
+
+## Notes & Décisions
+
+### Décisions techniques actées
+- **Framework :** Next.js 16 App Router
+- **State UI :** Zustand
+- **Server state :** Axios + hooks simples dans un premier temps
+- **Charts :** Recharts
+- **Fonts :** packages locales Fontsource pour éviter la dépendance build à Google Fonts
+
+### Décisions de qualité
+- `npm run lint` passe
+- `npx next build --webpack` passe
+- Le rendu final n'a pas encore été validé visuellement dans un vrai navigateur multi-breakpoint
+
+---
+
+## Prochaine Action
+
+**Démarrer la Phase 2 :** brancher le dashboard sur `/api/dashboard/full`.
+
+### Ordre recommandé
+1. Ajouter `lib/api/client.ts`
+2. Ajouter `lib/hooks/useDashboard.ts`
+3. Remplacer `lib/mock/dashboard.ts` dans `/dashboard`
+4. Brancher `/login`
+5. Poser le guard d'auth dans `(dashboard)/layout.tsx`

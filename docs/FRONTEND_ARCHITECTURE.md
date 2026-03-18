@@ -1,342 +1,275 @@
 # Architecture Frontend - Meziane Monitoring
 
-**Version 2.0 - 16 mars 2026**
+**Version 3.1 - 17 mars 2026 - Baseline implémentée**
 
 ---
 
 ## 1. Vision
 
-**Bloomberg Terminal pour patrimoine immobilier**
-- Interface **dense** : 12+ widgets simultanés
-- **Dark/Light mode** au choix (toggle dans header)
-- Mise à jour **temps réel** (WebSocket)
-- Toutes infos critiques visibles d'un coup d'œil
+**Bloomberg Terminal + Perplexity Finance Design**
+- Interface **dense** : 12 widgets visibles sans navigation secondaire.
+- **Design Perplexity Finance** : fond noir profond, surfaces vitrées, métriques compactes.
+- **Dark/Light mode** : toggle global dans le header.
+- **Code simple** : composants courts, peu de dépendances, structure lisible.
+- **Temps réel** : prévu via WebSocket backend.
+- Toutes les infos critiques doivent rester visibles d'un coup d'œil.
 
 ---
 
 ## 2. Stack Technique
 
+```text
+Next.js 16 (App Router)
+TypeScript 5
+TailwindCSS 4
+Recharts
+Axios
+Zustand
+WebSocket
+Fontsource local (Inter Variable + JetBrains Mono)
 ```
-Next.js 14 (App Router)
-TypeScript 5.3
-TailwindCSS 3.4 + shadcn/ui
-Recharts (charts)
-React Query v5 (state + real-time)
-Zustand (UI state)
-WebSocket (real-time data)
-```
+
+**Pas de React Query au début** → Axios direct + `useState` / `useEffect`.
+
+**Pas de shadcn/ui** → composants custom simples.
+
+**Pas de dépendances décoratives** → privilégier la clarté et le temps de livraison.
+
+**Charts en client-only** → import dynamique sans SSR pour éviter les warnings de sizing Recharts en build statique.
 
 ---
 
 ## 3. Pages de l'Application
 
-### 3.1 Sitemap
+### 3.1 Sitemap cible
 
-```
+```text
 / (redirect → /login si non auth, sinon /dashboard)
-├── /login                    # Auth JWT
-├── /dashboard                # Bloomberg dashboard (12+ widgets)
-├── /agents                   # Liste + config agents IA
-│   ├── /agents/new           # Créer nouvel agent
-│   └── /agents/[id]          # Config agent existant
-└── /admin                    # CRUD biens, SCI, analytics
+├── /login
+├── /dashboard
+├── /agents
+│   ├── /agents/new
+│   └── /agents/[id]
+└── /admin
     ├── /admin/biens
     ├── /admin/sci
     ├── /admin/locataires
-    └── /admin/analytics      # Stats clics si partage dashboard
+    └── /admin/analytics
 ```
 
-### 3.2 Routing Next.js
+### 3.2 Baseline actuellement livrée
 
+```text
+/                         → redirect /dashboard
+/login                    → page statique auth
+/dashboard                → dashboard Bloomberg mocké
+/agents                   → placeholder phase 3
+/admin                    → placeholder phase 3
 ```
+
+### 3.3 Routing Next.js
+
+```text
 frontend/src/app/
+├── page.tsx
 ├── (auth)/
 │   └── login/page.tsx
-├── (dashboard)/
-│   ├── layout.tsx            # Sidebar + Header
-│   ├── dashboard/page.tsx    # Bloomberg dashboard
-│   ├── agents/
-│   │   ├── page.tsx
-│   │   ├── new/page.tsx
-│   │   └── [id]/page.tsx
-│   └── admin/
-│       ├── page.tsx
-│       ├── biens/page.tsx
-│       ├── sci/page.tsx
-│       ├── locataires/page.tsx
-│       └── analytics/page.tsx
+└── (dashboard)/
+    ├── layout.tsx
+    ├── dashboard/page.tsx
+    ├── agents/page.tsx
+    └── admin/page.tsx
 ```
 
 ---
 
-## 4. Dashboard Bloomberg (Page Principale)
+## 4. Dashboard Bloomberg
 
 ### Layout Grid (12 widgets)
 
-```
+```text
 ┌────────────────┬────────────────┬────────────────┬────────────────┐
 │ Patrimoine Net │ Cashflow Today │ Alertes IA     │ Performance YTD│
-│ 2.4M€ (+3.2%)  │ +12K€          │ 3 nouvelles    │ +18.5%         │
 ├────────────────┴────────────────┼────────────────┴────────────────┤
 │ Graphique Cashflow 30j          │ Évolution Patrimoine 12m        │
-│ [Area Chart]                    │ [Line Chart]                    │
 ├─────────────────────────────────┼─────────────────────────────────┤
-│ Transactions Récentes (Table)   │ Top 5 Biens (Cards)             │
-│ 10 dernières transactions       │ Tri par TRI décroissant         │
+│ Transactions Récentes           │ Top 5 Biens                     │
 ├─────────────────────────────────┼─────────────────────────────────┤
-│ SCI Overview (6 mini-cards)     │ Locataires (5 cards)            │
-│ Revenus/Biens par SCI           │ Statut paiement                 │
+│ SCI Overview                    │ Locataires                      │
 ├─────────────────────────────────┼─────────────────────────────────┤
-│ Simulation Acquisition          │ Opportunités IA (Agent)         │
-│ Formulaire rapide               │ 2 biens trouvés                 │
+│ Simulation Acquisition          │ Opportunités IA                 │
 └─────────────────────────────────┴─────────────────────────────────┘
 ```
 
-### Widgets Principaux
+### Widgets
 
-1. **KPICard** : Patrimoine, Cashflow, Alertes, Performance
-2. **CashflowChart** : Area chart 30 jours
-3. **PatrimoineChart** : Line chart 12 mois
-4. **TransactionsTable** : 10 dernières transactions (tri, filtres)
-5. **Top5Biens** : Cards avec TRI + rendement
-6. **SCIOverview** : 6 mini-cards (revenus, nb biens, cashflow)
-7. **LocatairesCards** : Statut paiement (OK, retard, impayé)
-8. **SimulationForm** : Prix, apport, taux → TRI
-9. **OpportunitesWidget** : Biens trouvés par agent IA
+1. `KpiCard` x4
+2. `CashflowChart`
+3. `PatrimoineChart`
+4. `TransactionsTable`
+5. `TopBiensList`
+6. `SCIOverviewGrid`
+7. `LocatairesList`
+8. `SimulationPanel`
+9. `OpportunitesList`
 
----
-
-## 5. Page Login
-
-```tsx
-// app/(auth)/login/page.tsx
-Formulaire email/password
-→ POST /api/auth/login
-→ Store JWT token (localStorage)
-→ Redirect /dashboard
-```
-
-Design : Centré, minimal, dark theme
+Le total affiché est bien de **12 widgets** en comptant les 4 KPI séparés.
 
 ---
 
-## 6. Page Agents IA
+## 5. Structure Dossiers
 
-### Liste agents (`/agents`)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ Agent                  │ Statut  │ Dernière exec │ Actions│
-├────────────────────────┼─────────┼───────────────┼────────┤
-│ Prospection SeLoger    │ ✅ Actif│ Il y a 2h     │ ⚙️ 🗑️  │
-│ Analyse Bien           │ ✅ Actif│ Il y a 30min  │ ⚙️ 🗑️  │
-│ Veille Réglementaire   │ ⏸️ Pause│ -             │ ▶️ ⚙️  │
-└────────────────────────┴─────────┴───────────────┴────────┘
-
-[+ Créer Nouvel Agent]
-```
-
-### Config agent (`/agents/[id]`)
-
-```
-Formulaire :
-- Nom agent
-- Type (Prospection / Analyse / Veille)
-- Fréquence exécution (quotidien, hebdo)
-- Critères (prix min/max, ville, rendement cible)
-- Actif/Pause
-
-[Logs Historique]
-Table : Date | Action | Résultat
-```
-
-### Créer agent (`/agents/new`)
-
-Même formulaire que config, sans logs.
-
----
-
-## 7. Page Admin
-
-### Structure
-
-```
-/admin
-├── Biens       → DataTable + Modal create/edit
-├── SCI         → DataTable + Modal create/edit
-├── Locataires  → DataTable + Modal create/edit
-└── Analytics   → Stats clics si dashboard partagé (Google Analytics style)
-```
-
-### Admin Biens (`/admin/biens`)
-
-```
-DataTable :
-Colonnes : Adresse | SCI | Prix | Loyer | TRI | Actions (✏️ 🗑️)
-
-Modal Create/Edit :
-- Adresse complète
-- SCI (select)
-- Prix acquisition
-- Loyer mensuel
-- Upload photo (optionnel)
-```
-
-### Admin Analytics (`/admin/analytics`)
-
-Si dashboard partagé (future feature) :
-- Nb vues dashboard
-- Clics par widget
-- Temps moyen session
-
----
-
-## 8. Structure Dossiers
-
-```
+```text
 frontend/src/
 ├── app/
+│   ├── page.tsx
+│   ├── globals.css
+│   ├── layout.tsx
 │   ├── (auth)/login/page.tsx
 │   └── (dashboard)/
-│       ├── layout.tsx                 # Sidebar + auth check
-│       ├── dashboard/page.tsx         # Bloomberg dashboard
-│       ├── agents/...
-│       └── admin/...
+│       ├── layout.tsx
+│       ├── dashboard/page.tsx
+│       ├── agents/page.tsx
+│       └── admin/page.tsx
 ├── components/
-│   ├── layout/
-│   │   ├── Sidebar.tsx
-│   │   └── Header.tsx
-│   ├── widgets/                       # 9 widgets Bloomberg
-│   │   ├── KPICard.tsx
+│   ├── dashboard/
 │   │   ├── CashflowChart.tsx
-│   │   ├── TransactionsTable.tsx
-│   │   └── ...
-│   ├── forms/
-│   │   ├── BienForm.tsx
-│   │   ├── AgentForm.tsx
-│   │   └── SimulationForm.tsx
-│   └── ui/                            # shadcn/ui
-├── lib/
-│   ├── api/
-│   │   ├── client.ts                  # axios + JWT interceptor
-│   │   ├── cashflow.ts
-│   │   ├── patrimoine.ts
-│   │   └── agents.ts
-│   ├── hooks/
-│   │   ├── useRealTime.ts             # WebSocket hook
-│   │   ├── useCashflow.ts             # React Query
-│   │   └── usePatrimoine.ts
-│   ├── stores/
-│   │   └── ui-store.ts                # Zustand (sidebar collapse, etc.)
-│   ├── types/
-│   │   └── index.ts                   # Types backend
-│   └── utils/
-│       ├── format.ts                  # Format €, %, dates
-│       └── calc.ts                    # Calculs TRI, cashflow
-└── styles/
-    └── globals.css
+│   │   ├── ChartPanels.tsx
+│   │   ├── KpiCard.tsx
+│   │   ├── LocatairesList.tsx
+│   │   ├── OpportunitesList.tsx
+│   │   ├── PatrimoineChart.tsx
+│   │   ├── SCIOverviewGrid.tsx
+│   │   ├── SimulationPanel.tsx
+│   │   ├── TopBiensList.tsx
+│   │   └── TransactionsTable.tsx
+│   ├── layout/
+│   │   ├── Header.tsx
+│   │   ├── Sidebar.tsx
+│   │   └── ThemeToggle.tsx
+│   ├── providers/
+│   │   └── ThemeProvider.tsx
+│   └── ui/
+│       └── Panel.tsx
+└── lib/
+    ├── mock/dashboard.ts
+    ├── stores/ui-store.ts
+    ├── types/dashboard.ts
+    └── utils/format.ts
+```
+
+### Dossiers prévus pour la phase 2+
+
+```text
+frontend/src/lib/
+├── api/client.ts
+├── hooks/useDashboard.ts
+└── hooks/useRealTime.ts
 ```
 
 ---
 
-## 9. Design System
+## 6. Design System
 
-### Couleurs (Dark/Light Mode)
+### Principes
+
+- Fond non plat avec gradients diffus et grille discrète.
+- Surfaces `glass` avec blur léger.
+- Chiffres en `font-mono` tabulaire.
+- Panels arrondis et compacts.
+- Priorité au contraste et à la lisibilité des métriques.
+
+### Couleurs
 
 ```css
-DARK MODE (par défaut) :
-Background : bg-slate-950
-Text       : text-slate-200
-Border     : border-slate-800
+Dark :
+- background   : #0A0A0A
+- foreground   : #F5F7FA
+- accent       : #38BDF8
+- positive     : #34D399
+- negative     : #F87171
+- warning      : #FBBF24
 
-LIGHT MODE :
-Background : bg-white
-Text       : text-slate-900
-Border     : border-slate-200
-
-Accents (identiques dark/light) :
-- Revenus/Positif : text-emerald-500 (dark) / text-emerald-600 (light)
-- Dépenses/Négatif : text-red-500 (dark) / text-red-600 (light)
-- Neutre/Info     : text-cyan-500 (dark) / text-cyan-600 (light)
-- Warning         : text-amber-500 (dark) / text-amber-600 (light)
-```
-
-### Toggle Dark/Light Mode
-
-```typescript
-// Composant ThemeToggle dans Header
-// Zustand store pour persister choix (localStorage)
-// Classes Tailwind : dark:bg-slate-950 bg-white
+Light :
+- background   : #F3F5F7
+- foreground   : #101828
+- accent       : #0EA5E9
+- positive     : #059669
+- negative     : #DC2626
+- warning      : #D97706
 ```
 
 ### Typographie
 
-```
-Font : Inter Variable
-Chiffres : JetBrains Mono (font-mono, tabular-nums)
+```text
+Texte : Inter Variable
+Chiffres : JetBrains Mono Variable
 ```
 
-### Spacing (Dense)
+### Spacing
 
-```
-Widgets : p-4, gap-2
-KPI Cards : p-3
-Charts : h-64
+```text
+Panels : p-5 / p-6
+KPI : p-4
+Gap principal : gap-4
+Charts : h-72
 ```
 
 ---
 
-## 10. Intégration Backend
+## 7. Intégration Backend
 
-### API Client
+### API client prévu
 
 ```typescript
 // lib/api/client.ts
-import axios from 'axios';
+import axios from "axios";
 
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+export const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('jwt_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const token = localStorage.getItem("jwt_token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
-
-export default api;
 ```
 
-### React Query Hook Exemple
+### Stratégie de chargement dashboard
 
-```typescript
-// lib/hooks/useCashflow.ts
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api/client';
+Le point d'entrée cible pour la phase 2 est :
 
-export function useCashflow() {
-  return useQuery({
-    queryKey: ['cashflow'],
-    queryFn: async () => {
-      const { data } = await api.get('/api/cashflow');
-      return data;
-    },
-    refetchInterval: 30000, // 30s
-  });
-}
+```text
+GET /api/dashboard/full
 ```
 
-### WebSocket Real-Time
+Schéma recommandé :
 
 ```typescript
-// lib/hooks/useRealTime.ts
+const [data, setData] = useState<FullDashboardResponse | null>(null);
+const [loading, setLoading] = useState(true);
+
 useEffect(() => {
-  const ws = new WebSocket('ws://localhost:8000/ws');
+  api.get("/api/dashboard/full").then((response) => {
+    setData(response.data);
+    setLoading(false);
+  });
+}, []);
+```
+
+### Real-time prévu
+
+```typescript
+useEffect(() => {
+  const ws = new WebSocket("ws://localhost:8000/ws");
 
   ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    if (data.event === 'TRANSACTION_CREATED') {
-      queryClient.invalidateQueries(['cashflow']);
+    const payload = JSON.parse(event.data);
+    if (payload.event === "TRANSACTION_CREATED") {
+      reloadDashboard();
     }
   };
 
@@ -346,39 +279,48 @@ useEffect(() => {
 
 ---
 
-## 11. Roadmap Frontend
+## 8. Roadmap Frontend
 
-### Phase 1 : Setup + Dashboard Statique (3 jours)
-- Init Next.js 14 + TypeScript
-- Setup TailwindCSS + shadcn/ui
-- Layout sidebar + header
-- 12 widgets avec mock data
-- Design system complet
+### Phase 1 : Setup + Dashboard Statique
+- Initialisation Next.js + TypeScript
+- Setup TailwindCSS + design tokens dark/light
+- Layout `Sidebar + Header + ThemeToggle`
+- Dashboard 12 widgets en mock
+- Login, Admin, Agents en placeholders
 
-### Phase 2 : Intégration API (3 jours)
-- API client + JWT
-- React Query hooks
-- Connexion backend réel
-- Page Login fonctionnelle
+### Phase 2 : Intégration API
+- `lib/api/client.ts`
+- Hook `useDashboard`
+- Connexion `/api/dashboard/full`
+- Login JWT fonctionnel
+- Auth guard et redirections
 
-### Phase 3 : Pages Admin + Agents (3 jours)
-- CRUD Biens, SCI, Locataires
-- Page Agents (liste + config)
-- Formulaires + validation
+### Phase 3 : Pages Admin + Agents
+- CRUD Biens / SCI / Locataires
+- Liste agents
+- Configuration agent
+- Formulaires métier
 
-### Phase 4 : Real-Time (2 jours)
-- WebSocket connection
-- Auto-invalidation cache React Query
-- Toast notifications
+### Phase 4 : Real-Time
+- Hook `useRealTime`
+- Refresh dashboard à réception des événements
+- Notifications toast
 
-### Phase 5 : Optimisations (2 jours)
-- Virtualisation tables
-- Lazy loading
-- Mobile responsive
+### Phase 5 : Optimisations
+- Virtualisation table transactions
+- Lazy loading des zones lourdes
+- Responsive mobile finalisé
 - Tests E2E
 
 ---
 
-**FIN - 300 lignes**
+## 9. Décisions de mise en œuvre
+
+- Le dashboard est statique au départ pour verrouiller le langage visuel avant le branchement API.
+- Le backend expose déjà `/api/dashboard/full`, ce qui réduit le coût de la phase 2.
+- Le build local fiable passe aujourd'hui par `next build --webpack`.
+- Le build Turbopack sandboxé peut échouer sur des contraintes d'environnement et ne doit pas être utilisé comme signal produit.
+
+---
 
 **Rappel : Concis, clair, net. YAGNI. KISS.**
