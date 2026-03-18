@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { documentsApi, TypeDocument, DOCUMENT_TYPE_LABELS, SCI_DOCUMENT_TYPES } from '@/lib/api/documents'
+import { documentsApi, TypeDocument, DOCUMENT_TYPE_LABELS, SCI_DOCUMENT_TYPES, BIEN_DOCUMENT_TYPES, LOCATAIRE_DOCUMENT_TYPES } from '@/lib/api/documents'
 import { toast } from 'sonner'
 import { Upload, File as FileIcon } from 'lucide-react'
 
@@ -44,6 +44,8 @@ interface DocumentUploadDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   sciId: number
+  bienId?: number
+  locataireId?: number
   onSuccess: () => void
 }
 
@@ -51,6 +53,8 @@ export function DocumentUploadDialog({
   open,
   onOpenChange,
   sciId,
+  bienId,
+  locataireId,
   onSuccess,
 }: DocumentUploadDialogProps) {
   const [isUploading, setIsUploading] = useState(false)
@@ -68,6 +72,7 @@ export function DocumentUploadDialog({
   })
 
   const typeDocument = watch('type_document')
+  const documentTypes = locataireId ? LOCATAIRE_DOCUMENT_TYPES : bienId ? BIEN_DOCUMENT_TYPES : SCI_DOCUMENT_TYPES
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -90,6 +95,8 @@ export function DocumentUploadDialog({
         sci_id: sciId,
         type_document: data.type_document,
         file: selectedFile,
+        bien_id: bienId,
+        locataire_id: locataireId,
         date_document: data.date_document || undefined,
       })
 
@@ -112,7 +119,11 @@ export function DocumentUploadDialog({
         <DialogHeader>
           <DialogTitle>Télécharger un document</DialogTitle>
           <DialogDescription>
-            Ajoutez un document pour cette SCI (KBIS, Statuts, Relevés, etc.)
+            {locataireId
+              ? 'Ajoutez un document pour ce locataire (Pièce d\'identité, Contrat de travail, etc.)'
+              : bienId
+              ? 'Ajoutez un document pour ce bien (Bail, DPE, Diagnostics, etc.)'
+              : 'Ajoutez un document pour cette SCI (KBIS, Statuts, Relevés, etc.)'}
           </DialogDescription>
         </DialogHeader>
 
@@ -131,7 +142,7 @@ export function DocumentUploadDialog({
                   <SelectValue placeholder="Sélectionnez un type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {SCI_DOCUMENT_TYPES.map((type) => (
+                  {documentTypes.map((type) => (
                     <SelectItem key={type} value={type}>
                       {DOCUMENT_TYPE_LABELS[type]}
                     </SelectItem>

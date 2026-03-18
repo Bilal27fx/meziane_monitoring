@@ -34,6 +34,29 @@ export const SCI_DOCUMENT_TYPES = [
   TypeDocument.AUTRE,
 ]
 
+export const BIEN_DOCUMENT_TYPES = [
+  TypeDocument.BAIL,
+  TypeDocument.DIAGNOSTIC_DPE,
+  TypeDocument.DIAGNOSTIC_AMIANTE,
+  TypeDocument.FACTURE,
+  TypeDocument.TAXE_FONCIERE,
+  TypeDocument.RELEVE_BANCAIRE,
+  TypeDocument.AUTRE,
+]
+
+export const LOCATAIRE_DOCUMENT_TYPES = [
+  TypeDocument.PIECE_IDENTITE,
+  TypeDocument.JUSTIFICATIF_DOMICILE,
+  TypeDocument.CONTRAT_TRAVAIL,
+  TypeDocument.FICHE_PAIE,
+  TypeDocument.AVIS_IMPOSITION,
+  TypeDocument.RIB,
+  TypeDocument.ASSURANCE_HABITATION,
+  TypeDocument.ACTE_CAUTION_SOLIDAIRE,
+  TypeDocument.QUITTANCE_LOYER_PRECEDENTE,
+  TypeDocument.AUTRE,
+]
+
 export const DOCUMENT_TYPE_LABELS: Record<TypeDocument, string> = {
   [TypeDocument.FACTURE]: 'Facture',
   [TypeDocument.RELEVE_BANCAIRE]: 'Relevé bancaire',
@@ -73,6 +96,7 @@ export interface DocumentUpload {
   type_document: TypeDocument
   file: File
   bien_id?: number
+  locataire_id?: number
   date_document?: string
   metadata_json?: string
 }
@@ -96,6 +120,9 @@ export const documentsApi = {
 
     if (data.bien_id) {
       formData.append('bien_id', data.bien_id.toString())
+    }
+    if (data.locataire_id) {
+      formData.append('locataire_id', data.locataire_id.toString())
     }
     if (data.date_document) {
       formData.append('date_document', data.date_document)
