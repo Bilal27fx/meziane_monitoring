@@ -19,14 +19,15 @@ from typing import List, Optional
 from app.schemas.bien_schema import BienCreate, BienUpdate, BienResponse
 from app.services.patrimoine_service import PatrimoineService
 from app.utils.db import get_db
+from app.utils.auth import get_current_user
 
-router = APIRouter(prefix="/api/biens", tags=["Biens"])
+router = APIRouter(prefix="/api/biens", tags=["Biens"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=List[BienResponse])
-def get_all_biens(sci_id: Optional[int] = Query(None, description="Filtrer par SCI"), db: Session = Depends(get_db)):  # Récupère tous les biens (filtrable par SCI)
+def get_all_biens(sci_id: Optional[int] = Query(None, description="Filtrer par SCI"), limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):  # Récupère tous les biens (paginé, filtrable par SCI)
     service = PatrimoineService(db)
-    return service.get_all_biens(sci_id=sci_id)
+    return service.get_all_biens(sci_id=sci_id, limit=limit, offset=offset)
 
 
 @router.get("/{bien_id}", response_model=BienResponse)

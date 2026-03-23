@@ -31,9 +31,11 @@ from app.schemas.dashboard_schema import (
 from app.services.dashboard_service import DashboardService
 from app.utils.db import get_db
 from app.utils.logger import setup_logger
+from app.utils.auth import get_current_user
+from app.plugins import PluginRegistry
 
 logger = setup_logger(__name__)
-router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/kpi", response_model=KPIResponse)
@@ -217,6 +219,12 @@ def get_dashboard_opportunites(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur lors de la récupération des opportunités: {str(e)}"
         )
+
+
+@router.get("/global")
+def get_global_dashboard(db: Session = Depends(get_db)):
+    """Dashboard global multi-business — agrège les KPI de tous les plugins enregistrés"""
+    return PluginRegistry.get_all_kpis(db)
 
 
 @router.get("/full", response_model=FullDashboardResponse)

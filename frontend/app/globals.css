@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter Variable', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-bg-base: #0a0a0a;
+  --color-bg-card: #111111;
+  --color-bg-overlay: #0d0d0d;
+  --color-bg-hover: #1a1a1a;
+  --color-bg-active: #262626;
+  --color-border-default: #262626;
+  --color-border-hover: #404040;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a3a3a3;
+  --color-text-muted: #737373;
+  --color-text-faint: #525252;
+  --color-positive: #22c55e;
+  --color-negative: #ef4444;
+  --color-neutral: #3b82f6;
+  --color-warning: #eab308;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background-color: #0a0a0a;
+  color: #ffffff;
+  font-family: 'Inter Variable', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb { background: #262626; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #404040; }
+
+.recharts-tooltip-wrapper { outline: none !important; }

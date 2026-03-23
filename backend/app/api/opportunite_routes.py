@@ -29,9 +29,10 @@ from app.models.opportunite import Opportunite
 from app.agents.agent_prospection import AgentProspection
 from app.utils.db import get_db
 from app.utils.logger import setup_logger
+from app.utils.auth import get_current_user
 
 logger = setup_logger(__name__)
-router = APIRouter(prefix="/api/opportunites", tags=["Opportunités"])
+router = APIRouter(prefix="/api/opportunites", tags=["Opportunités"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=List[OpportuniteResponse])

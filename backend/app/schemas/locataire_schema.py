@@ -7,7 +7,7 @@ Validation des donnees API.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import date
 
 
@@ -41,6 +41,40 @@ class LocataireUpdate(BaseModel):
 
 class LocataireResponse(LocataireBase):
     id: int
+
+    class Config:
+        from_attributes = True
+
+
+class BailSummary(BaseModel):  # Résumé bail pour LocataireDetailResponse
+    id: int
+    bien_adresse: Optional[str] = None
+    loyer_mensuel: float
+    charges_mensuelles: Optional[float] = None
+    date_debut: date
+    date_fin: Optional[date] = None
+    statut: str
+
+    class Config:
+        from_attributes = True
+
+
+class QuittanceSummary(BaseModel):  # Résumé quittance pour LocataireDetailResponse
+    id: int
+    mois: int
+    annee: int
+    montant_total: float
+    statut: str
+
+    class Config:
+        from_attributes = True
+
+
+class LocataireDetailResponse(LocataireBase):  # Schema réponse détaillée — frontend dashboard
+    id: int
+    bail_actif: Optional[BailSummary] = None        # Bail en cours
+    quittances_recentes: List[QuittanceSummary] = [] # 3 dernières quittances
+    nb_impayes: int = 0
 
     class Config:
         from_attributes = True

@@ -32,8 +32,8 @@ class PatrimoineService:  # Service gestion patrimoine (SCI, Biens)
 
     # === SCI Methods ===
 
-    def get_all_sci(self) -> List[SCI]:  # Récupère toutes les SCI
-        return self.db.query(SCI).all()
+    def get_all_sci(self, limit: int = 50, offset: int = 0) -> List[SCI]:  # Récupère toutes les SCI (paginé)
+        return self.db.query(SCI).limit(limit).offset(offset).all()
 
     def get_sci_by_id(self, sci_id: int) -> Optional[SCI]:  # Récupère SCI par ID
         return self.db.query(SCI).filter(SCI.id == sci_id).first()
@@ -69,11 +69,11 @@ class PatrimoineService:  # Service gestion patrimoine (SCI, Biens)
 
     # === Bien Methods ===
 
-    def get_all_biens(self, sci_id: Optional[int] = None) -> List[Bien]:  # Récupère tous les biens (filtrable par SCI)
+    def get_all_biens(self, sci_id: Optional[int] = None, limit: int = 50, offset: int = 0) -> List[Bien]:  # Récupère tous les biens (filtrable par SCI, paginé)
         query = self.db.query(Bien)
         if sci_id:
             query = query.filter(Bien.sci_id == sci_id)
-        return query.all()
+        return query.limit(limit).offset(offset).all()
 
     def get_bien_by_id(self, bien_id: int) -> Optional[Bien]:  # Récupère bien par ID
         return self.db.query(Bien).filter(Bien.id == bien_id).first()
@@ -126,8 +126,8 @@ class PatrimoineService:  # Service gestion patrimoine (SCI, Biens)
 
     # === Locataire Methods ===
 
-    def get_all_locataires(self) -> List[Locataire]:
-        return self.db.query(Locataire).all()
+    def get_all_locataires(self, limit: int = 50, offset: int = 0) -> List[Locataire]:  # Paginé
+        return self.db.query(Locataire).limit(limit).offset(offset).all()
 
     def get_locataire_by_id(self, locataire_id: int) -> Optional[Locataire]:
         return self.db.query(Locataire).filter(Locataire.id == locataire_id).first()

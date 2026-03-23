@@ -23,14 +23,17 @@ from app.schemas.transaction_schema import (
     TransactionUpdate,
     TransactionResponse,
     TransactionCategorizeRequest,
-    TransactionCategorizeResponse
+    TransactionCategorizeResponse,
+    AnalyticsCategorieResponse,
+    AnalyticsMensuelResponse,
 )
 from app.models.transaction import TransactionCategorie, StatutValidation
 from app.services.transaction_service import TransactionService
 from app.services.categorization_service import CategorizationService
 from app.utils.db import get_db
+from app.utils.auth import get_current_user
 
-router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
+router = APIRouter(prefix="/api/transactions", tags=["Transactions"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=List[TransactionResponse])
@@ -154,24 +157,25 @@ def rejeter_transaction(
     return transaction
 
 
-@router.get("/analytics/by-categorie")
+@router.get("/analytics/by-categorie", response_model=AnalyticsCategorieResponse)
 def get_analytics_by_categorie(
     sci_id: Optional[int] = Query(None, description="Filtrer par SCI"),
     annee: Optional[int] = Query(None, description="Filtrer par année"),
     db: Session = Depends(get_db)
 ):  # Récupère totaux par catégorie
     service = TransactionService(db)
-    return service.get_total_by_categorie(sci_id=sci_id, annee=annee)
+    return {"totaux": service.get_total_by_categorie(sci_id=sci_id, annee=annee)}
 
 
-@router.get("/analytics/mensuel/{sci_id}/{annee}")
+@router.get("/analytics/mensuel/{sci_id}/{annee}", response_model=AnalyticsMensuelResponse)
 def get_analytics_mensuel(
     sci_id: int,
     annee: int,
     db: Session = Depends(get_db)
 ):  # Récupère total mensuel pour une SCI
     service = TransactionService(db)
-    return service.get_total_mensuel(sci_id=sci_id, annee=annee)
+    data = service.get_total_mensuel(sci_id=sci_id, annee=annee)
+    return {"sci_id": sci_id, "annee": annee, "mois": {str(k): v for k, v in data.items()}}
 
 
 @router.post("/{transaction_id}/categorize", response_model=TransactionResponse)

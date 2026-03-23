@@ -23,9 +23,10 @@ from app.schemas.document_schema import (
 )
 from app.utils.db import get_db
 from app.utils.storage import upload_bytes
+from app.utils.auth import get_current_user
 from app.config import settings
 
-router = APIRouter(prefix="/api/documents", tags=["Documents"])
+router = APIRouter(prefix="/api/documents", tags=["Documents"], dependencies=[Depends(get_current_user)])
 
 LOCATAIRE_REQUIRED_DOCUMENTS: List[TypeDocument] = [
     TypeDocument.PIECE_IDENTITE,

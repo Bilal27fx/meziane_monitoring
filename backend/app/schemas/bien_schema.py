@@ -65,3 +65,13 @@ class BienResponse(BienBase):  # Schema réponse API avec ID
 
     class Config:
         from_attributes = True
+
+
+class BienDetailResponse(BienBase):  # Schema réponse détaillée — frontend dashboard
+    id: int
+    sci_nom: Optional[str] = None           # Nom SCI (évite requête supplémentaire)
+    bail_actif: bool = False                 # Bien loué actuellement
+    cashflow_ytd: Optional[float] = None    # Cashflow year-to-date
+
+    class Config:
+        from_attributes = True

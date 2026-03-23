@@ -15,7 +15,7 @@ Utilisé par:
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, and_
+from sqlalchemy import func, extract, and_, case
 from typing import Dict, List, Optional
 from datetime import date, datetime
 from decimal import Decimal
@@ -82,16 +82,18 @@ class CashflowService:  # Service calcul cashflow et analytics financiers
             "mois": mois
         }
 
-    def get_bien_cashflow_mensuel(self, bien_id: int, annee: int) -> Dict:  # Cashflow mensuel d'un bien sur une année
-        results = {}
-        for mois in range(1, 13):
-            cashflow = self.get_bien_cashflow(bien_id, annee, mois)
-            results[mois] = {
-                "revenus": cashflow["revenus"],
-                "depenses": cashflow["depenses"],
-                "net": cashflow["cashflow_net"]
-            }
-        return results
+    def get_bien_cashflow_mensuel(self, bien_id: int, annee: int) -> Dict:  # Cashflow mensuel d'un bien — 1 seule requête GROUP BY
+        rows = self.db.query(
+            extract('month', Transaction.date).label('mois'),
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label('revenus'),
+            func.sum(case((Transaction.montant < 0, Transaction.montant), else_=0)).label('depenses'),
+        ).filter(
+            Transaction.bien_id == bien_id,
+            extract('year', Transaction.date) == annee,
+        ).group_by('mois').all()
+
+        data = {int(r.mois): {"revenus": float(r.revenus or 0), "depenses": abs(float(r.depenses or 0)), "net": float(r.revenus or 0) + float(r.depenses or 0)} for r in rows}
+        return {m: data.get(m, {"revenus": 0, "depenses": 0, "net": 0}) for m in range(1, 13)}
 
     # === Cashflow par SCI ===
 
@@ -145,16 +147,18 @@ class CashflowService:  # Service calcul cashflow et analytics financiers
             "mois": mois
         }
 
-    def get_sci_cashflow_mensuel(self, sci_id: int, annee: int) -> Dict:  # Cashflow mensuel SCI sur une année
-        results = {}
-        for mois in range(1, 13):
-            cashflow = self.get_sci_cashflow(sci_id, annee, mois)
-            results[mois] = {
-                "revenus": cashflow["revenus"],
-                "depenses": cashflow["depenses"],
-                "net": cashflow["cashflow_net"]
-            }
-        return results
+    def get_sci_cashflow_mensuel(self, sci_id: int, annee: int) -> Dict:  # Cashflow mensuel SCI — 1 seule requête GROUP BY
+        rows = self.db.query(
+            extract('month', Transaction.date).label('mois'),
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label('revenus'),
+            func.sum(case((Transaction.montant < 0, Transaction.montant), else_=0)).label('depenses'),
+        ).filter(
+            Transaction.sci_id == sci_id,
+            extract('year', Transaction.date) == annee,
+        ).group_by('mois').all()
+
+        data = {int(r.mois): {"revenus": float(r.revenus or 0), "depenses": abs(float(r.depenses or 0)), "net": float(r.revenus or 0) + float(r.depenses or 0)} for r in rows}
+        return {m: data.get(m, {"revenus": 0, "depenses": 0, "net": 0}) for m in range(1, 13)}
 
     # === Cashflow Global ===
 
@@ -194,16 +198,17 @@ class CashflowService:  # Service calcul cashflow et analytics financiers
             "mois": mois
         }
 
-    def get_global_cashflow_mensuel(self, annee: int) -> Dict:  # Cashflow mensuel global sur une année
-        results = {}
-        for mois in range(1, 13):
-            cashflow = self.get_global_cashflow(annee, mois)
-            results[mois] = {
-                "revenus": cashflow["revenus"],
-                "depenses": cashflow["depenses"],
-                "net": cashflow["cashflow_net"]
-            }
-        return results
+    def get_global_cashflow_mensuel(self, annee: int) -> Dict:  # Cashflow mensuel global — 1 seule requête GROUP BY
+        rows = self.db.query(
+            extract('month', Transaction.date).label('mois'),
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label('revenus'),
+            func.sum(case((Transaction.montant < 0, Transaction.montant), else_=0)).label('depenses'),
+        ).filter(
+            extract('year', Transaction.date) == annee,
+        ).group_by('mois').all()
+
+        data = {int(r.mois): {"revenus": float(r.revenus or 0), "depenses": abs(float(r.depenses or 0)), "net": float(r.revenus or 0) + float(r.depenses or 0)} for r in rows}
+        return {m: data.get(m, {"revenus": 0, "depenses": 0, "net": 0}) for m in range(1, 13)}
 
     # === Analytics par Catégorie ===
 

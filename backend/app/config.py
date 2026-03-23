@@ -14,7 +14,8 @@ Utilisé par:
 """
 
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
+from pathlib import Path
 
 
 class Settings(BaseSettings):  # Configuration globale application chargée depuis .env
@@ -47,6 +48,7 @@ class Settings(BaseSettings):  # Configuration globale application chargée depu
     SECRET_KEY: str = "dev_secret_key_change_in_production"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
 
     # Email
     SMTP_HOST: Optional[str] = None
@@ -62,7 +64,7 @@ class Settings(BaseSettings):  # Configuration globale application chargée depu
     TWILIO_WHATSAPP_TO: Optional[str] = None
 
     class Config:
-        env_file = "../.env"
+        env_file = str(Path(__file__).parent.parent / ".env")
         case_sensitive = True
         extra = "ignore"
 

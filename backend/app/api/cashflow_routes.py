@@ -27,8 +27,9 @@ from app.schemas.cashflow_schema import (
 )
 from app.services.cashflow_service import CashflowService
 from app.utils.db import get_db
+from app.utils.auth import get_current_user
 
-router = APIRouter(prefix="/api/cashflow", tags=["Cashflow"])
+router = APIRouter(prefix="/api/cashflow", tags=["Cashflow"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/bien/{bien_id}", response_model=BienCashflowResponse)

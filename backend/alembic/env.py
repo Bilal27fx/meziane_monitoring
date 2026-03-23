@@ -30,6 +30,7 @@ from app.models.document import Document
 from app.models.document_extraction import DocumentExtraction
 from app.models.opportunite import Opportunite
 from app.models.simulation import Simulation
+from app.models.user import User
 
 config = context.config
 

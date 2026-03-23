@@ -14,8 +14,8 @@ Utilisé par:
 - api.dashboard_routes
 """
 
-from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, and_, or_, desc
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, extract, and_, or_, desc, case
 from typing import Dict, List, Optional
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -197,21 +197,41 @@ class DashboardService:
     # === ÉVOLUTION PATRIMOINE 12 MOIS ===
 
     def get_patrimoine_12months(self) -> List[Dict]:
-        """Évolution patrimoine sur 12 derniers mois"""
+        """Évolution patrimoine sur 12 derniers mois — basée sur les transactions cumulées"""
         today = date.today()
-        result = []
 
-        # Pour simplification, on retourne la valeur actuelle pour chaque mois
-        # Dans une vraie implémentation, il faudrait historiser les valeurs
+        # Valeur actuelle du patrimoine
         patrimoine_actuel = self._calculate_patrimoine_net()
 
-        for i in range(12, 0, -1):
-            month_date = today - timedelta(days=30 * i)
-            result.append({
-                "date": month_date.strftime("%Y-%m"),
-                "valeur": patrimoine_actuel
-            })
+        # Cashflow cumulé par mois depuis 12 mois (GROUP BY)
+        rows = self.db.query(
+            extract('year', Transaction.date).label('annee'),
+            extract('month', Transaction.date).label('mois'),
+            func.sum(Transaction.montant).label('total'),
+        ).filter(
+            Transaction.date >= today - timedelta(days=365)
+        ).group_by('annee', 'mois').order_by('annee', 'mois').all()
 
+        cashflow_par_mois = {
+            f"{int(r.annee)}-{int(r.mois):02d}": float(r.total or 0)
+            for r in rows
+        }
+
+        # Reconstitue l'évolution en soustrayant du patrimoine actuel (de la fin vers le début)
+        result = []
+        valeur_courante = patrimoine_actuel
+        mois_list = []
+
+        for i in range(11, -1, -1):
+            ref = today - timedelta(days=30 * i)
+            mois_list.append(ref.strftime("%Y-%m"))
+
+        for mois_key in reversed(mois_list):
+            cf = cashflow_par_mois.get(mois_key, 0)
+            result.append({"date": mois_key, "valeur": round(valeur_courante, 2)})
+            valeur_courante -= cf  # Recule dans le temps
+
+        result.reverse()
         return result
 
     # === DERNIÈRES TRANSACTIONS ===
@@ -245,132 +265,150 @@ class DashboardService:
     # === TOP 5 BIENS PAR RENTABILITÉ ===
 
     def get_top_biens_by_rentabilite(self, limit: int = 5) -> List[Dict]:
-        """Top biens par rentabilité (TRI/rendement)"""
+        """Top biens par rentabilité — 2 requêtes au lieu de N×3"""
         current_year = datetime.now().year
 
-        # Récupère tous les biens
-        biens = self.db.query(Bien).filter(
-            Bien.valeur_actuelle.isnot(None)
-        ).all()
+        # 1. Cashflow annuel par bien (1 requête GROUP BY)
+        cashflow_rows = self.db.query(
+            Transaction.bien_id,
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label('revenus'),
+            func.sum(case((Transaction.montant < 0, Transaction.montant), else_=0)).label('depenses'),
+            func.sum(Transaction.montant).label('cashflow_net'),
+        ).filter(
+            Transaction.bien_id.isnot(None),
+            extract('year', Transaction.date) == current_year,
+        ).group_by(Transaction.bien_id).all()
+        cashflow_map = {r.bien_id: r for r in cashflow_rows}
 
-        biens_with_rentabilite = []
+        # 2. Biens avec valeur (1 requête)
+        biens = self.db.query(Bien).filter(Bien.valeur_actuelle.isnot(None)).all()
 
+        result = []
         for bien in biens:
-            rentabilite_data = self.cashflow_service.get_bien_rentabilite(
-                bien.id,
-                current_year
-            )
+            cf = cashflow_map.get(bien.id)
+            revenus = float(cf.revenus or 0) if cf else 0
+            cashflow_net = float(cf.cashflow_net or 0) if cf else 0
+            valeur = float(bien.valeur_actuelle)
+            rentabilite_brute = (revenus / valeur * 100) if valeur > 0 else 0
+            rentabilite_nette = (cashflow_net / valeur * 100) if valeur > 0 else 0
+            result.append({
+                "id": bien.id,
+                "adresse": bien.adresse,
+                "ville": bien.ville,
+                "type_bien": bien.type_bien.value,
+                "valeur_actuelle": valeur,
+                "rentabilite_brute": round(rentabilite_brute, 2),
+                "rentabilite_nette": round(rentabilite_nette, 2),
+                "cashflow_annuel": cashflow_net,
+            })
 
-            if rentabilite_data:
-                biens_with_rentabilite.append({
-                    "id": bien.id,
-                    "adresse": bien.adresse,
-                    "ville": bien.ville,
-                    "type_bien": bien.type_bien.value,
-                    "valeur_actuelle": float(bien.valeur_actuelle or 0),
-                    "rentabilite_brute": rentabilite_data.get("rentabilite_brute", 0),
-                    "rentabilite_nette": rentabilite_data.get("rentabilite_nette", 0),
-                    "cashflow_annuel": rentabilite_data.get("cashflow_net", 0)
-                })
-
-        # Trie par rentabilité nette décroissante
-        biens_with_rentabilite.sort(
-            key=lambda x: x["rentabilite_nette"],
-            reverse=True
-        )
-
-        return biens_with_rentabilite[:limit]
+        result.sort(key=lambda x: x["rentabilite_nette"], reverse=True)
+        return result[:limit]
 
     # === VUE D'ENSEMBLE SCI ===
 
     def get_sci_overview(self) -> List[Dict]:
-        """Vue d'ensemble de toutes les SCI avec KPI"""
-        sci_list = self.db.query(SCI).all()
+        """Vue d'ensemble SCI — 3 requêtes agrégées au lieu de N×3"""
         current_year = datetime.now().year
 
+        # 1. Toutes les SCI
+        sci_list = self.db.query(SCI).all()
+
+        # 2. Stats biens par SCI (1 requête GROUP BY)
+        bien_stats = self.db.query(
+            Bien.sci_id,
+            func.count(Bien.id).label('nb_biens'),
+            func.sum(Bien.valeur_actuelle).label('valeur_totale'),
+        ).group_by(Bien.sci_id).all()
+        bien_map = {r.sci_id: r for r in bien_stats}
+
+        # 3. Cashflow par SCI année en cours (1 requête GROUP BY)
+        cf_rows = self.db.query(
+            Transaction.sci_id,
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label('revenus'),
+            func.sum(case((Transaction.montant < 0, Transaction.montant), else_=0)).label('depenses'),
+            func.sum(Transaction.montant).label('cashflow_net'),
+        ).filter(
+            extract('year', Transaction.date) == current_year,
+        ).group_by(Transaction.sci_id).all()
+        cf_map = {r.sci_id: r for r in cf_rows}
+
         result = []
-
         for sci in sci_list:
-            # Nombre de biens
-            nb_biens = self.db.query(func.count(Bien.id)).filter(
-                Bien.sci_id == sci.id
-            ).scalar() or 0
-
-            # Valeur patrimoniale
-            valeur_totale = self.db.query(
-                func.sum(Bien.valeur_actuelle)
-            ).filter(
-                Bien.sci_id == sci.id,
-                Bien.valeur_actuelle.isnot(None)
-            ).scalar() or 0
-
-            # Cashflow année en cours
-            cashflow_data = self.cashflow_service.get_sci_cashflow(sci.id, current_year)
-
+            bs = bien_map.get(sci.id)
+            cf = cf_map.get(sci.id)
             result.append({
                 "id": sci.id,
                 "nom": sci.nom,
                 "siret": sci.siret,
-                "nb_biens": nb_biens,
-                "valeur_patrimoniale": float(valeur_totale),
-                "cashflow_annuel": cashflow_data.get("cashflow_net", 0),
-                "revenus_annuels": cashflow_data.get("revenus", 0),
-                "depenses_annuelles": cashflow_data.get("depenses", 0)
+                "nb_biens": int(bs.nb_biens) if bs else 0,
+                "valeur_patrimoniale": float(bs.valeur_totale or 0) if bs else 0,
+                "cashflow_annuel": float(cf.cashflow_net or 0) if cf else 0,
+                "revenus_annuels": float(cf.revenus or 0) if cf else 0,
+                "depenses_annuelles": abs(float(cf.depenses or 0)) if cf else 0,
             })
-
         return result
 
     # === LOCATAIRES AVEC STATUT PAIEMENT ===
 
     def get_locataires_overview(self) -> List[Dict]:
-        """Liste locataires avec statut paiement et bail actif"""
+        """Liste locataires avec bail actif — joinedload au lieu de N×3 requêtes"""
 
-        # Récupère tous les locataires avec bail actif
-        locataires = self.db.query(Locataire).join(
-            Bail, Locataire.id == Bail.locataire_id
-        ).filter(
+        # 1. Baux actifs avec locataire et bien chargés en 1 requête (joinedload)
+        baux = self.db.query(Bail).filter(
             Bail.statut == StatutBail.ACTIF
-        ).distinct().all()
+        ).options(
+            joinedload(Bail.locataire),
+            joinedload(Bail.bien),
+        ).all()
+
+        bail_ids = [b.id for b in baux]
+        if not bail_ids:
+            return []
+
+        # 2. Nb impayés par bail (1 requête GROUP BY)
+        impayes_rows = self.db.query(
+            Quittance.bail_id,
+            func.count(Quittance.id).label('nb'),
+        ).filter(
+            Quittance.bail_id.in_(bail_ids),
+            Quittance.statut.in_([StatutQuittance.IMPAYE, StatutQuittance.PARTIEL]),
+        ).group_by(Quittance.bail_id).all()
+        impayes_map = {r.bail_id: r.nb for r in impayes_rows}
+
+        # 3. Dernière quittance par bail (1 requête avec rank)
+        # On utilise une sous-requête max(annee*100+mois) pour éviter window functions
+        derniere_q_sub = self.db.query(
+            Quittance.bail_id,
+            func.max(Quittance.annee * 100 + Quittance.mois).label('max_period'),
+        ).filter(Quittance.bail_id.in_(bail_ids)).group_by(Quittance.bail_id).subquery()
+
+        dernieres_q = self.db.query(Quittance).join(
+            derniere_q_sub,
+            and_(
+                Quittance.bail_id == derniere_q_sub.c.bail_id,
+                Quittance.annee * 100 + Quittance.mois == derniere_q_sub.c.max_period,
+            )
+        ).all()
+        derniere_map = {q.bail_id: q for q in dernieres_q}
 
         result = []
-
-        for locataire in locataires:
-            # Bail actif
-            bail_actif = self.db.query(Bail).filter(
-                Bail.locataire_id == locataire.id,
-                Bail.statut == StatutBail.ACTIF
-            ).first()
-
-            if not bail_actif:
+        for bail in baux:
+            if not bail.locataire:
                 continue
-
-            # Dernière quittance
-            derniere_quittance = self.db.query(Quittance).filter(
-                Quittance.bail_id == bail_actif.id
-            ).order_by(
-                desc(Quittance.annee),
-                desc(Quittance.mois)
-            ).first()
-
-            # Nombre d'impayés
-            nb_impayes = self.db.query(func.count(Quittance.id)).filter(
-                Quittance.bail_id == bail_actif.id,
-                Quittance.statut.in_([StatutQuittance.IMPAYE, StatutQuittance.PARTIEL])
-            ).scalar() or 0
-
+            derniere_q = derniere_map.get(bail.id)
             result.append({
-                "id": locataire.id,
-                "nom": locataire.nom,
-                "prenom": locataire.prenom,
-                "email": locataire.email,
-                "telephone": locataire.telephone,
-                "bien_adresse": bail_actif.bien.adresse if bail_actif.bien else None,
-                "loyer_mensuel": float(bail_actif.loyer_mensuel),
-                "statut_paiement": derniere_quittance.statut.value if derniere_quittance else "en_attente",
-                "nb_impayes": nb_impayes,
-                "date_debut_bail": bail_actif.date_debut.isoformat()
+                "id": bail.locataire.id,
+                "nom": bail.locataire.nom,
+                "prenom": bail.locataire.prenom,
+                "email": bail.locataire.email,
+                "telephone": bail.locataire.telephone,
+                "bien_adresse": bail.bien.adresse if bail.bien else None,
+                "loyer_mensuel": float(bail.loyer_mensuel),
+                "statut_paiement": derniere_q.statut.value if derniere_q else "en_attente",
+                "nb_impayes": impayes_map.get(bail.id, 0),
+                "date_debut_bail": bail.date_debut.isoformat(),
             })
-
         return result
 
     # === OPPORTUNITÉS IA ===
