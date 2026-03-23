@@ -40,6 +40,8 @@ minio==7.2.0
 scrapy==2.11.0
 selenium==4.16.0
 beautifulsoup4==4.12.2
+playwright==1.40.0
+twilio==8.10.0
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0

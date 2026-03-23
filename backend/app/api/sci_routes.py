@@ -13,20 +13,21 @@ Utilisé par:
 - main.py (inclusion router)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.schemas.sci_schema import SCICreate, SCIUpdate, SCIResponse
 from app.services.patrimoine_service import PatrimoineService
 from app.utils.db import get_db
+from app.utils.auth import get_current_user
 
-router = APIRouter(prefix="/api/sci", tags=["SCI"])
+router = APIRouter(prefix="/api/sci", tags=["SCI"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=List[SCIResponse])
-def get_all_sci(db: Session = Depends(get_db)):  # Récupère toutes les SCI
+def get_all_sci(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):  # Récupère toutes les SCI (paginé)
     service = PatrimoineService(db)
-    return service.get_all_sci()
+    return service.get_all_sci(limit=limit, offset=offset)
 
 
 @router.get("/{sci_id}", response_model=SCIResponse)

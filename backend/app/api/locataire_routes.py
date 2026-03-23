@@ -5,20 +5,21 @@ Description:
 Endpoints CRUD pour les locataires.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.schemas.locataire_schema import LocataireCreate, LocataireUpdate, LocataireResponse
 from app.services.patrimoine_service import PatrimoineService
 from app.utils.db import get_db
+from app.utils.auth import get_current_user
 
-router = APIRouter(prefix="/api/locataires", tags=["Locataires"])
+router = APIRouter(prefix="/api/locataires", tags=["Locataires"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=List[LocataireResponse])
-def get_all_locataires(db: Session = Depends(get_db)):
+def get_all_locataires(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):  # Paginé
     service = PatrimoineService(db)
-    return service.get_all_locataires()
+    return service.get_all_locataires(limit=limit, offset=offset)
 
 
 @router.get("/{locataire_id}", response_model=LocataireResponse)

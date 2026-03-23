@@ -15,7 +15,7 @@ Utilisé par:
 - banking_connector.py
 """
 
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, Enum, Text, Boolean
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Enum, Text, Boolean
 from sqlalchemy.orm import relationship
 from app.utils.db import Base
 from datetime import datetime
@@ -66,7 +66,7 @@ class Transaction(Base):  # Représente transaction bancaire SCI
     date_validation = Column(Date, nullable=True)
 
     # Metadata
-    created_at = Column(Date, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Relations
     sci = relationship("SCI", back_populates="transactions")

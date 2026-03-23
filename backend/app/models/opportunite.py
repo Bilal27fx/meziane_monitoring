@@ -13,7 +13,7 @@ Utilisé par:
 - acquisition_service.py
 """
 
-from sqlalchemy import Column, Integer, String, Float, Date, Enum, Text
+from sqlalchemy import Column, Integer, String, Float, Date, Enum, Text, JSON
 from app.utils.db import Base
 from datetime import datetime
 import enum
@@ -70,7 +70,7 @@ class Opportunite(Base):  # Représente opportunité immobilière détectée
     score_etat = Column(Integer, nullable=True)
     score_global = Column(Integer, nullable=True, index=True)
     raison_score = Column(Text, nullable=True)
-    risques = Column(Text, nullable=True)  # JSON array
+    risques = Column(JSON, nullable=True)  # Liste de risques (filtrable/indexable)
 
     # Suivi
     date_detection = Column(Date, nullable=False, default=datetime.utcnow, index=True)

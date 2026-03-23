@@ -15,7 +15,7 @@ Utilisé par:
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict
 from datetime import date
 from enum import Enum
 
@@ -86,3 +86,20 @@ class TransactionCategorizeResponse(BaseModel):  # Schema réponse catégorisati
     categorie: TransactionCategorie
     confidence: float = Field(..., ge=0, le=1)
     raison: str
+
+
+class AnalyticsCategorieResponse(BaseModel):  # Schema réponse analytics par catégorie
+    totaux: Dict[str, float]
+
+
+class AnalyticsMensuelItem(BaseModel):  # Un mois dans l'analytique mensuelle
+    mois: int
+    revenus: float
+    depenses: float
+    net: float
+
+
+class AnalyticsMensuelResponse(BaseModel):  # Schema réponse analytics mensuelle
+    sci_id: int
+    annee: int
+    mois: Dict[str, AnalyticsMensuelItem]
