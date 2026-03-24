@@ -46,6 +46,17 @@ class SCIUpdate(BaseModel):  # Schema mise à jour SCI (tous champs optionnels)
 
 class SCIResponse(SCIBase):  # Schema réponse API avec ID
     id: int
+    nb_biens: int = 0
+    valeur_totale: Optional[float] = None
+    cashflow_mensuel: Optional[float] = None
 
     class Config:
         from_attributes = True
+
+
+class SCIPaginatedResponse(BaseModel):  # Réponse paginée pour liste SCI
+    items: list[SCIResponse]
+    total: int
+    page: int
+    per_page: int
+    pages: int

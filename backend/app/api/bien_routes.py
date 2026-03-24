@@ -3,7 +3,7 @@ bien_routes.py - Routes API gestion Biens immobiliers
 
 Description:
 Endpoints CRUD pour les biens immobiliers.
-Filtrage possible par SCI.
+Filtrage possible par SCI et statut.
 
 Dépendances:
 - patrimoine_service.py
@@ -15,8 +15,9 @@ Utilisé par:
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from app.schemas.bien_schema import BienCreate, BienUpdate, BienResponse
+from typing import Optional
+from app.schemas.bien_schema import BienCreate, BienUpdate, BienResponse, BienPaginatedResponse
+from app.models.bien import StatutBien
 from app.services.patrimoine_service import PatrimoineService
 from app.utils.db import get_db
 from app.utils.auth import get_current_user
@@ -24,10 +25,19 @@ from app.utils.auth import get_current_user
 router = APIRouter(prefix="/api/biens", tags=["Biens"], dependencies=[Depends(get_current_user)])
 
 
-@router.get("/", response_model=List[BienResponse])
-def get_all_biens(sci_id: Optional[int] = Query(None, description="Filtrer par SCI"), limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):  # Récupère tous les biens (paginé, filtrable par SCI)
+@router.get("/", response_model=BienPaginatedResponse)
+def get_all_biens(
+    sci_id: Optional[int] = Query(None, description="Filtrer par SCI"),
+    statut: Optional[StatutBien] = Query(None, description="Filtrer par statut"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):  # Récupère tous les biens (paginé, filtrable par SCI et statut)
     service = PatrimoineService(db)
-    return service.get_all_biens(sci_id=sci_id, limit=limit, offset=offset)
+    items, total = service.get_all_biens(sci_id=sci_id, statut=statut, limit=limit, offset=offset)
+    page = (offset // limit) + 1
+    pages = max(1, (total + limit - 1) // limit)
+    return BienPaginatedResponse(items=items, total=total, page=page, per_page=limit, pages=pages)
 
 
 @router.get("/{bien_id}", response_model=BienResponse)

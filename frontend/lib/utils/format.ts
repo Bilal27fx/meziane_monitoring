@@ -1,4 +1,5 @@
-export function formatCurrency(value: number): string {
+export function formatCurrency(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '—'
   if (Math.abs(value) >= 1_000_000) {
     return `${(value / 1_000_000).toFixed(1)}M€`
   }
@@ -8,7 +9,8 @@ export function formatCurrency(value: number): string {
   return `${value.toLocaleString('fr-FR')}€`
 }
 
-export function formatCurrencyFull(value: number): string {
+export function formatCurrencyFull(value: number | null | undefined): string {
+  if (value == null || isNaN(value)) return '—'
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'EUR',
@@ -33,15 +35,18 @@ export function formatDateLong(d: string | Date): string {
   })
 }
 
-export function formatPercent(v: number): string {
+export function formatPercent(v: number | null | undefined): string {
+  if (v == null || isNaN(v)) return '—'
   return `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
 }
 
-export function formatPercentRaw(v: number): string {
+export function formatPercentRaw(v: number | null | undefined): string {
+  if (v == null || isNaN(v)) return '—'
   return `${v.toFixed(2)}%`
 }
 
-export function formatNumber(v: number): string {
+export function formatNumber(v: number | null | undefined): string {
+  if (v == null || isNaN(v)) return '—'
   return v.toLocaleString('fr-FR')
 }
 

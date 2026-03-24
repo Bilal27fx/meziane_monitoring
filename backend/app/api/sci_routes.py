@@ -15,8 +15,7 @@ Utilisé par:
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List
-from app.schemas.sci_schema import SCICreate, SCIUpdate, SCIResponse
+from app.schemas.sci_schema import SCICreate, SCIUpdate, SCIResponse, SCIPaginatedResponse
 from app.services.patrimoine_service import PatrimoineService
 from app.utils.db import get_db
 from app.utils.auth import get_current_user
@@ -24,10 +23,13 @@ from app.utils.auth import get_current_user
 router = APIRouter(prefix="/api/sci", tags=["SCI"], dependencies=[Depends(get_current_user)])
 
 
-@router.get("/", response_model=List[SCIResponse])
+@router.get("/", response_model=SCIPaginatedResponse)
 def get_all_sci(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):  # Récupère toutes les SCI (paginé)
     service = PatrimoineService(db)
-    return service.get_all_sci(limit=limit, offset=offset)
+    items, total = service.get_all_sci(limit=limit, offset=offset)
+    page = (offset // limit) + 1
+    pages = max(1, (total + limit - 1) // limit)
+    return SCIPaginatedResponse(items=items, total=total, page=page, per_page=limit, pages=pages)
 
 
 @router.get("/{sci_id}", response_model=SCIResponse)

@@ -5,39 +5,48 @@ export interface SCI {
   nom: string
   siret?: string
   forme_juridique?: string
-  capital_social?: number
-  adresse_siege?: string
+  capital?: number
+  siege_social?: string
+  gerant_nom?: string
+  gerant_prenom?: string
   date_creation?: string
-  email?: string
   nb_biens?: number
   valeur_totale?: number
   cashflow_mensuel?: number
-  created_at: string
-  updated_at: string
 }
 
 export interface Bien {
   id: number
   sci_id: number
-  sci?: SCI
+  sci_nom?: string
   adresse: string
-  complement?: string
+  complement_adresse?: string
   ville: string
   code_postal: string
-  type: 'appartement' | 'maison' | 'bureau' | 'commerce' | 'terrain' | 'parking'
+  type_bien: 'appartement' | 'studio' | 'maison' | 'local_commercial' | 'immeuble' | 'parking' | 'autre'
   surface?: number
   nb_pieces?: number
   etage?: number
-  dpe?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'
-  validite_dpe?: string
+  dpe_classe?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'non_renseigne'
+  dpe_date_validite?: string
   prix_acquisition?: number
   date_acquisition?: string
   valeur_actuelle?: number
   statut: 'loue' | 'vacant' | 'travaux' | 'vente'
   loyer_mensuel?: number
   tri_net?: number
-  created_at: string
-  updated_at: string
+}
+
+export interface BailInfo {
+  id: number
+  bien_id: number
+  bien_adresse?: string
+  loyer_mensuel: number
+  charges_mensuelles: number
+  depot_garantie?: number
+  date_debut: string
+  date_fin?: string
+  statut: string
 }
 
 export interface Locataire {
@@ -50,26 +59,9 @@ export interface Locataire {
   profession?: string
   revenus_annuels?: number
   bien_id?: number
-  bien?: Bien
-  bail?: Bail
+  bail?: BailInfo
   statut_paiement?: 'a_jour' | 'retard' | 'impaye'
   jours_retard?: number
-  created_at: string
-  updated_at: string
-}
-
-export interface Bail {
-  id: number
-  locataire_id: number
-  bien_id: number
-  date_debut: string
-  date_fin?: string
-  loyer: number
-  charges: number
-  depot_garantie?: number
-  type_revision?: 'IRL' | 'ILC' | 'fixe'
-  created_at: string
-  updated_at: string
 }
 
 export interface Transaction {
@@ -96,6 +88,75 @@ export interface Quittance {
   statut: 'payee' | 'en_attente' | 'impayee'
   date_paiement?: string
   created_at: string
+}
+
+export type TypeDocument =
+  | 'facture'
+  | 'releve_bancaire'
+  | 'taxe_fonciere'
+  | 'bail'
+  | 'diagnostic_dpe'
+  | 'diagnostic_amiante'
+  | 'statuts_sci'
+  | 'kbis'
+  | 'piece_identite'
+  | 'justificatif_domicile'
+  | 'contrat_travail'
+  | 'fiche_paie'
+  | 'avis_imposition'
+  | 'rib'
+  | 'assurance_habitation'
+  | 'acte_caution_solidaire'
+  | 'quittance_loyer_precedente'
+  | 'autre'
+
+export const TYPE_DOCUMENT_LABELS: Record<TypeDocument, string> = {
+  facture: 'Facture',
+  releve_bancaire: 'Relevé bancaire',
+  taxe_fonciere: 'Taxe foncière',
+  bail: 'Bail',
+  diagnostic_dpe: 'Diagnostic DPE',
+  diagnostic_amiante: 'Diagnostic amiante',
+  statuts_sci: 'Statuts SCI',
+  kbis: 'KBIS',
+  piece_identite: "Pièce d'identité",
+  justificatif_domicile: 'Justificatif de domicile',
+  contrat_travail: 'Contrat de travail',
+  fiche_paie: 'Fiche de paie',
+  avis_imposition: "Avis d'imposition",
+  rib: 'RIB',
+  assurance_habitation: 'Assurance habitation',
+  acte_caution_solidaire: 'Acte de caution solidaire',
+  quittance_loyer_precedente: 'Quittance loyer précédente',
+  autre: 'Autre',
+}
+
+export const TYPE_DOCUMENT_SCI: TypeDocument[] = [
+  'statuts_sci', 'kbis', 'bail', 'facture', 'releve_bancaire',
+  'taxe_fonciere', 'diagnostic_dpe', 'diagnostic_amiante', 'autre',
+]
+
+export const TYPE_DOCUMENT_BIEN: TypeDocument[] = [
+  'bail', 'diagnostic_dpe', 'diagnostic_amiante', 'taxe_fonciere',
+  'facture', 'releve_bancaire', 'autre',
+]
+
+export const TYPE_DOCUMENT_LOCATAIRE: TypeDocument[] = [
+  'piece_identite', 'justificatif_domicile', 'contrat_travail', 'fiche_paie',
+  'avis_imposition', 'rib', 'assurance_habitation', 'acte_caution_solidaire',
+  'quittance_loyer_precedente', 'bail', 'autre',
+]
+
+export interface Document {
+  id: number
+  sci_id: number
+  bien_id?: number
+  locataire_id?: number
+  type_document: TypeDocument
+  nom_fichier: string
+  s3_url?: string
+  date_document?: string
+  uploaded_at: string
 }
 
 export interface Opportunite {
@@ -270,43 +331,75 @@ export interface SCIFormData {
   nom: string
   siret?: string
   forme_juridique?: string
-  capital_social?: number
-  adresse_siege?: string
+  capital?: number
+  siege_social?: string
+  gerant_nom?: string
+  gerant_prenom?: string
   date_creation?: string
-  email?: string
 }
 
 export interface BienFormData {
   sci_id: number
   adresse: string
-  complement?: string
+  complement_adresse?: string
   ville: string
   code_postal: string
-  type: string
+  type_bien: string
   surface?: number
   nb_pieces?: number
   etage?: number
-  dpe?: string
-  validite_dpe?: string
+  dpe_classe?: string | null
+  dpe_date_validite?: string | null
   prix_acquisition?: number
-  date_acquisition?: string
+  date_acquisition?: string | null
   valeur_actuelle?: number
   statut: string
+}
+
+export interface BailFormData {
+  bien_id: number
+  date_debut: string
+  date_fin?: string | null
+  loyer_mensuel: number
+  charges_mensuelles: number
+  depot_garantie?: number
 }
 
 export interface LocataireFormData {
   prenom: string
   nom: string
   email: string
-  telephone?: string
-  date_naissance?: string
-  profession?: string
+  telephone?: string | null
+  date_naissance?: string | null
+  profession?: string | null
   revenus_annuels?: number
-  bien_id?: number
-  date_debut?: string
-  date_fin?: string
-  loyer?: number
-  charges?: number
-  depot_garantie?: number
-  type_revision?: string
+  bail?: BailFormData
+}
+
+// ─── User Management ──────────────────────────────────────────────────────────
+
+export type UserRole = 'admin' | 'user' | 'readonly'
+
+export interface AppUser {
+  id: number
+  email: string
+  nom?: string | null
+  prenom?: string | null
+  role: UserRole
+  is_active: boolean
+  created_at: string
+  last_login?: string | null
+}
+
+export interface UserCreateData {
+  email: string
+  password: string
+  nom?: string
+  prenom?: string
+  role: UserRole
+}
+
+export interface UserUpdateData {
+  role?: UserRole
+  is_active?: boolean
 }

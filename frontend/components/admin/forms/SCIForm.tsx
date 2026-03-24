@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useCreateSCI, useUpdateSCI } from '@/lib/hooks/useAdmin'
-import { useAppStore } from '@/lib/stores/app-store'
 import toast from 'react-hot-toast'
 import type { SCI, SCIFormData } from '@/lib/types'
 
@@ -22,22 +21,25 @@ export default function SCIForm({ sci, onClose }: Props) {
     nom: sci?.nom ?? '',
     siret: sci?.siret ?? '',
     forme_juridique: sci?.forme_juridique ?? 'SCI',
-    capital_social: sci?.capital_social ?? undefined,
-    adresse_siege: sci?.adresse_siege ?? '',
+    capital: sci?.capital ?? undefined,
+    siege_social: sci?.siege_social ?? '',
+    gerant_nom: sci?.gerant_nom ?? '',
+    gerant_prenom: sci?.gerant_prenom ?? '',
     date_creation: sci?.date_creation ?? '',
-    email: sci?.email ?? '',
   })
 
-  const [errors, setErrors] = useState<{ nom?: string }>({})
+  const [errors, setErrors] = useState<{ nom?: string; siret?: string }>({})
 
   const set = (key: keyof SCIFormData, value: string | number) => {
     setForm((f) => ({ ...f, [key]: value }))
     if (key === 'nom') setErrors((e) => ({ ...e, nom: undefined }))
+    if (key === 'siret') setErrors((e) => ({ ...e, siret: undefined }))
   }
 
   const validate = () => {
-    const errs: { nom?: string } = {}
+    const errs: { nom?: string; siret?: string } = {}
     if (!form.nom.trim()) errs.nom = 'Le nom est requis'
+    if (form.siret && form.siret.replace(/\s/g, '').length !== 14) errs.siret = 'SIRET = 14 chiffres'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -45,13 +47,14 @@ export default function SCIForm({ sci, onClose }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validate()) return
-
+    // Nettoyer le SIRET (supprimer espaces)
+    const payload = { ...form, siret: form.siret?.replace(/\s/g, '') || undefined }
     try {
       if (sci) {
-        await updateSCI.mutateAsync({ id: sci.id, data: form })
+        await updateSCI.mutateAsync({ id: sci.id, data: payload })
         toast.success('SCI mise à jour')
       } else {
-        await createSCI.mutateAsync(form)
+        await createSCI.mutateAsync(payload)
         toast.success('SCI créée')
       }
       onClose()
@@ -78,14 +81,15 @@ export default function SCIForm({ sci, onClose }: Props) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className={labelClass}>SIRET</label>
+          <label className={labelClass}>SIRET (14 chiffres)</label>
           <input
             type="text"
             value={form.siret ?? ''}
             onChange={(e) => set('siret', e.target.value)}
             className={inputClass}
-            placeholder="123 456 789 00012"
+            placeholder="12345678900012"
           />
+          {errors.siret && <p className="text-[9px] text-[#ef4444] mt-0.5">{errors.siret}</p>}
         </div>
         <div>
           <label className={labelClass}>Forme juridique</label>
@@ -104,11 +108,11 @@ export default function SCIForm({ sci, onClose }: Props) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className={labelClass}>Capital social (€)</label>
+          <label className={labelClass}>Capital (€)</label>
           <input
             type="number"
-            value={form.capital_social ?? ''}
-            onChange={(e) => set('capital_social', Number(e.target.value))}
+            value={form.capital ?? ''}
+            onChange={(e) => set('capital', Number(e.target.value))}
             className={inputClass}
             placeholder="10000"
           />
@@ -124,25 +128,37 @@ export default function SCIForm({ sci, onClose }: Props) {
         </div>
       </div>
 
-      <div>
-        <label className={labelClass}>Adresse siège</label>
-        <input
-          type="text"
-          value={form.adresse_siege ?? ''}
-          onChange={(e) => set('adresse_siege', e.target.value)}
-          className={inputClass}
-          placeholder="12 Rue de la Paix, 75001 Paris"
-        />
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={labelClass}>Prénom gérant</label>
+          <input
+            type="text"
+            value={form.gerant_prenom ?? ''}
+            onChange={(e) => set('gerant_prenom', e.target.value)}
+            className={inputClass}
+            placeholder="Jean"
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Nom gérant</label>
+          <input
+            type="text"
+            value={form.gerant_nom ?? ''}
+            onChange={(e) => set('gerant_nom', e.target.value)}
+            className={inputClass}
+            placeholder="Dupont"
+          />
+        </div>
       </div>
 
       <div>
-        <label className={labelClass}>Email</label>
+        <label className={labelClass}>Siège social</label>
         <input
-          type="email"
-          value={form.email ?? ''}
-          onChange={(e) => set('email', e.target.value)}
+          type="text"
+          value={form.siege_social ?? ''}
+          onChange={(e) => set('siege_social', e.target.value)}
           className={inputClass}
-          placeholder="contact@sci.fr"
+          placeholder="12 Rue de la Paix, 75001 Paris"
         />
       </div>
 

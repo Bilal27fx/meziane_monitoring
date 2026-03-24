@@ -12,13 +12,6 @@ interface CashflowChartProps {
   data?: DataPoint[]
 }
 
-const DEFAULT_DATA: DataPoint[] = Array.from({ length: 30 }, (_, i) => {
-  const d = new Date(2026, 0, i + 1)
-  return {
-    date: d.toISOString().split('T')[0],
-    value: 3_800 + Math.round(Math.sin(i * 0.6) * 900 + Math.random() * 300),
-  }
-})
 
 function formatLabel(dateStr: string) {
   const d = new Date(dateStr)
@@ -39,7 +32,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export default function CashflowChart({ data = DEFAULT_DATA }: CashflowChartProps) {
+export default function CashflowChart({ data = [] }: CashflowChartProps) {
   const ticks = data.filter((_, i) => i % 5 === 0).map((d) => d.date)
 
   return (
@@ -51,7 +44,7 @@ export default function CashflowChart({ data = DEFAULT_DATA }: CashflowChartProp
         </span>
       </div>
       <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
           <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="cashflowGrad" x1="0" y1="0" x2="0" y2="1">

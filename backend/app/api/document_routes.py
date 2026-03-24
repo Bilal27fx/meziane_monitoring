@@ -9,6 +9,7 @@ import json
 import uuid
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Dict, List, Optional
 from app.models.document import Document, TypeDocument
@@ -22,7 +23,7 @@ from app.schemas.document_schema import (
     LocataireDocumentChecklistResponse,
 )
 from app.utils.db import get_db
-from app.utils.storage import upload_bytes
+from app.utils.storage import upload_bytes, get_minio_client
 from app.utils.auth import get_current_user
 from app.config import settings
 
@@ -108,6 +109,16 @@ def get_documents_by_sci(sci_id: int, db: Session = Depends(get_db)):
     return (
         db.query(Document)
         .filter(Document.sci_id == sci_id)
+        .order_by(Document.uploaded_at.desc(), Document.id.desc())
+        .all()
+    )
+
+
+@router.get("/bien/{bien_id}", response_model=List[DocumentResponse])
+def get_documents_by_bien(bien_id: int, db: Session = Depends(get_db)):
+    return (
+        db.query(Document)
+        .filter(Document.bien_id == bien_id)
         .order_by(Document.uploaded_at.desc(), Document.id.desc())
         .all()
     )
@@ -274,6 +285,82 @@ async def upload_locataire_document(
     db.commit()
     db.refresh(document)
     return document
+
+
+@router.get("/{document_id}/download")
+def download_document(document_id: int, db: Session = Depends(get_db)):
+    """Stream le fichier depuis MinIO — pour téléchargement (attachment)"""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} introuvable")
+
+    # Extraire bucket et object_name depuis l'URL stockée
+    # URL format: http://minio:9000/{bucket}/{object_name}
+    try:
+        parts = document.s3_url.split("/", 4)
+        bucket_name = parts[3]
+        object_name = parts[4]
+    except (IndexError, AttributeError):
+        raise HTTPException(status_code=500, detail="URL document invalide")
+
+    client = get_minio_client()
+    try:
+        response = client.get_object(bucket_name, object_name)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Fichier introuvable dans le stockage")
+
+    ext = (document.nom_fichier or "").lower()
+    if ext.endswith(".pdf"):
+        media_type = "application/pdf"
+    elif ext.endswith((".jpg", ".jpeg")):
+        media_type = "image/jpeg"
+    elif ext.endswith(".png"):
+        media_type = "image/png"
+    else:
+        media_type = "application/octet-stream"
+
+    return StreamingResponse(
+        response,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{document.nom_fichier}"'},
+    )
+
+
+@router.get("/{document_id}/preview")
+def preview_document(document_id: int, db: Session = Depends(get_db)):
+    """Stream le fichier depuis MinIO — pour prévisualisation inline"""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document {document_id} introuvable")
+
+    try:
+        parts = document.s3_url.split("/", 4)
+        bucket_name = parts[3]
+        object_name = parts[4]
+    except (IndexError, AttributeError):
+        raise HTTPException(status_code=500, detail="URL document invalide")
+
+    client = get_minio_client()
+    try:
+        response = client.get_object(bucket_name, object_name)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Fichier introuvable dans le stockage")
+
+    ext = (document.nom_fichier or "").lower()
+    if ext.endswith(".pdf"):
+        media_type = "application/pdf"
+    elif ext.endswith((".jpg", ".jpeg")):
+        media_type = "image/jpeg"
+    elif ext.endswith(".png"):
+        media_type = "image/png"
+    else:
+        media_type = "application/octet-stream"
+
+    return StreamingResponse(
+        response,
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{document.nom_fichier}"'},
+    )
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

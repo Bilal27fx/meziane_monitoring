@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Trash2, Plus } from 'lucide-react'
+import { Pencil, Trash2, Plus, FolderOpen } from 'lucide-react'
 import { useSCIs, useDeleteSCI } from '@/lib/hooks/useAdmin'
 import DataTable, { Column } from '@/components/ui/DataTable'
 import Modal from '@/components/ui/Modal'
 import SCIForm from '@/components/admin/forms/SCIForm'
+import DocumentsPanel from '@/components/admin/panels/DocumentsPanel'
 import { formatCurrency } from '@/lib/utils/format'
 import toast from 'react-hot-toast'
 import type { SCI } from '@/lib/types'
@@ -18,6 +19,8 @@ export default function SCITab() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSCI, setEditingSCI] = useState<SCI | undefined>()
   const [confirmDelete, setConfirmDelete] = useState<SCI | null>(null)
+  const [docsOpen, setDocsOpen] = useState(false)
+  const [selectedSCI, setSelectedSCI] = useState<SCI | null>(null)
 
   const handleEdit = (sci: SCI) => {
     setEditingSCI(sci)
@@ -65,6 +68,13 @@ export default function SCITab() {
             <Pencil className="h-3 w-3" />
           </button>
           <button
+            onClick={() => { setSelectedSCI(s); setDocsOpen(true) }}
+            className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#3b82f6] hover:bg-[#3b82f6]/10 transition-colors"
+            title="Documents"
+          >
+            <FolderOpen className="h-3 w-3" />
+          </button>
+          <button
             onClick={() => setConfirmDelete(s)}
             className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors"
           >
@@ -108,6 +118,15 @@ export default function SCITab() {
       >
         <SCIForm sci={editingSCI} onClose={() => setModalOpen(false)} />
       </Modal>
+
+      {/* Documents Panel */}
+      <DocumentsPanel
+        open={docsOpen}
+        onClose={() => setDocsOpen(false)}
+        entityType="sci"
+        entityId={selectedSCI?.id ?? null}
+        entityNom={selectedSCI?.nom}
+      />
 
       {/* Confirm Delete Modal */}
       <Modal

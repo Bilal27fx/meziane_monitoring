@@ -2,8 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, Zap, Settings2 } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { LayoutGrid, Zap, Settings2, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
+import { useAuth } from '@/lib/hooks/useAuth'
 
 const NAV_ITEMS = [
   { href: '/dashboard', icon: LayoutGrid, label: 'Dashboard' },
@@ -13,13 +15,30 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const { logout } = useAuth()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    if (menuOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-12 z-20 bg-[#0d0d0d] border-r border-[#262626] flex flex-col items-center">
-      {/* Logo */}
-      <div className="h-14 flex items-center justify-center w-full border-b border-[#262626]">
+      {/* Logo → Dashboard */}
+      <Link
+        href="/dashboard"
+        className="h-14 flex items-center justify-center w-full border-b border-[#262626] hover:bg-[#1a1a1a] transition-colors"
+        title="Dashboard"
+      >
         <span className="text-sm font-bold text-white">M</span>
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav className="flex flex-col items-center gap-1 pt-2 flex-1">
@@ -43,11 +62,27 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* User avatar */}
-      <div className="pb-3">
-        <div className="w-7 h-7 rounded-full bg-[#262626] flex items-center justify-center">
+      {/* User avatar + menu déconnexion */}
+      <div className="pb-3 relative" ref={menuRef}>
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          title="Mon compte"
+          className="w-7 h-7 rounded-full bg-[#262626] hover:bg-[#333333] flex items-center justify-center transition-colors"
+        >
           <span className="text-xs font-medium text-white">B</span>
-        </div>
+        </button>
+
+        {menuOpen && (
+          <div className="absolute bottom-10 left-0 w-36 bg-[#111111] border border-[#262626] rounded-md shadow-lg overflow-hidden">
+            <button
+              onClick={() => { setMenuOpen(false); logout() }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#ef4444] hover:bg-[#1a1a1a] transition-colors"
+            >
+              <LogOut className="h-3 w-3" />
+              Se déconnecter
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   )

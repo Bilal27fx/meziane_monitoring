@@ -62,9 +62,20 @@ class BienUpdate(BaseModel):  # Schema mise à jour Bien (tous champs optionnels
 
 class BienResponse(BienBase):  # Schema réponse API avec ID
     id: int
+    sci_nom: Optional[str] = None
+    loyer_mensuel: Optional[float] = None
+    tri_net: Optional[float] = None
 
     class Config:
         from_attributes = True
+
+
+class BienPaginatedResponse(BaseModel):  # Réponse paginée pour liste biens
+    items: list[BienResponse]
+    total: int
+    page: int
+    per_page: int
+    pages: int
 
 
 class BienDetailResponse(BienBase):  # Schema réponse détaillée — frontend dashboard

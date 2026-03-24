@@ -6,12 +6,6 @@ interface Top5BiensProps {
   data?: TopBien[]
 }
 
-const DEFAULT_DATA: TopBien[] = [
-  { id: 1, adresse: '12 Rue du Commerce, Paris 15e', sci_nom: 'SCI Facha', valeur: 420_000, tri_net: 8.2, rank: 1 },
-  { id: 2, adresse: '7 Av. Jean Jaurès, Lyon 3e', sci_nom: 'SCI La Renaissance', valeur: 285_000, tri_net: 6.7, rank: 2 },
-  { id: 3, adresse: '3 Bd de la Paix, Bordeaux', sci_nom: 'SCI Facha', valeur: 195_000, tri_net: 5.1, rank: 3 },
-  { id: 4, adresse: '18 Rue Ampère, Paris 17e', sci_nom: 'SCI Patrimoine+', valeur: 510_000, tri_net: 4.2, rank: 4 },
-]
 
 function triColor(tri: number): string {
   if (tri >= 7) return '#22c55e'
@@ -21,7 +15,7 @@ function triColor(tri: number): string {
 
 const MAX_TRI = 10
 
-export default function Top5Biens({ data = DEFAULT_DATA }: Top5BiensProps) {
+export default function Top5Biens({ data = [] }: Top5BiensProps) {
   return (
     <div className="h-full p-2 bg-[#111111] border border-[#262626] rounded-md flex flex-col">
       <div className="flex items-center justify-between mb-2">

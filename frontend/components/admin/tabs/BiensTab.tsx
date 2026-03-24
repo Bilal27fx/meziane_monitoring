@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Trash2, Plus, FileText } from 'lucide-react'
+import { Pencil, Trash2, Plus, FolderOpen } from 'lucide-react'
 import { useBiens, useDeleteBien, useSCIs } from '@/lib/hooks/useAdmin'
-import { useAppStore } from '@/lib/stores/app-store'
 import DataTable, { Column } from '@/components/ui/DataTable'
 import Modal from '@/components/ui/Modal'
 import BienForm from '@/components/admin/forms/BienForm'
-import QuittancesPanel from '@/components/admin/panels/QuittancesPanel'
+import DocumentsPanel from '@/components/admin/panels/DocumentsPanel'
 import Badge from '@/components/ui/Badge'
 import { formatCurrency, formatPercentRaw } from '@/lib/utils/format'
 import { cn } from '@/lib/utils/cn'
@@ -29,8 +28,8 @@ export default function BiensTab() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingBien, setEditingBien] = useState<Bien | undefined>()
   const [confirmDelete, setConfirmDelete] = useState<Bien | null>(null)
-  const [quittancesOpen, setQuittancesOpen] = useState(false)
-  const [selectedBienId, setSelectedBienId] = useState<number | null>(null)
+  const [docsOpen, setDocsOpen] = useState(false)
+  const [selectedBien, setSelectedBien] = useState<Bien | null>(null)
 
   const statutVariant = (statut: string) => {
     const map: Record<string, 'ok' | 'error' | 'warning' | 'default'> = {
@@ -54,10 +53,10 @@ export default function BiensTab() {
       </div>
     )},
     { header: 'SCI', accessor: 'sci_id', render: (b) => (
-      <span className="text-xs text-[#a3a3a3]">{scis.find((s) => s.id === b.sci_id)?.nom ?? '—'}</span>
+      <span className="text-xs text-[#a3a3a3]">{b.sci_nom ?? scis.find((s) => s.id === b.sci_id)?.nom ?? '—'}</span>
     )},
-    { header: 'Type', accessor: 'type', render: (b) => (
-      <span className="text-xs text-[#737373] capitalize">{b.type}</span>
+    { header: 'Type', accessor: 'type_bien', render: (b) => (
+      <span className="text-xs text-[#737373] capitalize">{b.type_bien?.replace('_', ' ')}</span>
     )},
     { header: 'Valeur', accessor: 'valeur_actuelle', render: (b) => (
       <span className="font-mono text-xs text-white tabular-nums">{b.valeur_actuelle ? formatCurrency(b.valeur_actuelle) : '—'}</span>
@@ -80,8 +79,8 @@ export default function BiensTab() {
         <button onClick={() => { setEditingBien(b); setModalOpen(true) }} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-white hover:bg-[#262626] transition-colors">
           <Pencil className="h-3 w-3" />
         </button>
-        <button onClick={() => { setSelectedBienId(b.id); setQuittancesOpen(true) }} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#3b82f6] hover:bg-[#3b82f6]/10 transition-colors">
-          <FileText className="h-3 w-3" />
+        <button onClick={() => { setSelectedBien(b); setDocsOpen(true) }} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#3b82f6] hover:bg-[#3b82f6]/10 transition-colors" title="Documents">
+          <FolderOpen className="h-3 w-3" />
         </button>
         <button onClick={() => setConfirmDelete(b)} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors">
           <Trash2 className="h-3 w-3" />
@@ -143,11 +142,13 @@ export default function BiensTab() {
         </div>
       </Modal>
 
-      <QuittancesPanel
-        open={quittancesOpen}
-        onClose={() => setQuittancesOpen(false)}
-        locataireNom="Documents du bien"
-        locataireId={selectedBienId}
+      <DocumentsPanel
+        open={docsOpen}
+        onClose={() => setDocsOpen(false)}
+        entityType="bien"
+        entityId={selectedBien?.id ?? null}
+        entityNom={selectedBien?.adresse}
+        sciId={selectedBien?.sci_id}
       />
     </div>
   )

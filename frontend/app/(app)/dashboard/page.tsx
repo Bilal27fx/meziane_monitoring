@@ -1,3 +1,5 @@
+'use client'
+
 import { Building2, TrendingUp, Users, DollarSign } from 'lucide-react'
 import KPICard from '@/components/dashboard/KPICard'
 import CashflowChart from '@/components/dashboard/CashflowChart'
@@ -8,8 +10,20 @@ import TransactionsTable from '@/components/dashboard/TransactionsTable'
 import SimulationForm from '@/components/dashboard/SimulationForm'
 import OpportunitesWidget from '@/components/dashboard/OpportunitesWidget'
 import LocatairesCards from '@/components/dashboard/LocatairesCards'
+import { useFullDashboard } from '@/lib/hooks/useDashboard'
+import { formatCurrency } from '@/lib/utils/format'
+
+function formatKPI(value: number): string {
+  if (!value && value !== 0) return '—'
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M€`
+  if (Math.abs(value) >= 1_000) return `${Math.round(value / 1_000)}K€`
+  return `${value}€`
+}
 
 export default function DashboardPage() {
+  const { data, isLoading } = useFullDashboard()
+  const kpis = data?.kpis
+
   return (
     <div className="h-[calc(100vh-56px)] p-3 overflow-hidden">
       <div
@@ -20,56 +34,56 @@ export default function DashboardPage() {
         <div className="col-span-3">
           <KPICard
             title="Patrimoine net"
-            value="2.39M€"
-            change={3.2}
-            trend="up"
+            value={isLoading ? '…' : formatKPI(kpis?.patrimoine_net ?? 0)}
+            change={kpis?.patrimoine_net_change}
+            trend={kpis?.patrimoine_net_change !== undefined ? (kpis.patrimoine_net_change >= 0 ? 'up' : 'down') : undefined}
             icon={Building2}
           />
         </div>
         <div className="col-span-3">
           <KPICard
             title="Cashflow mensuel"
-            value="4 215€"
-            change={1.8}
-            trend="up"
+            value={isLoading ? '…' : formatCurrency(kpis?.cashflow_mensuel ?? 0)}
+            change={kpis?.cashflow_mensuel_change}
+            trend={kpis?.cashflow_mensuel_change !== undefined ? (kpis.cashflow_mensuel_change >= 0 ? 'up' : 'down') : undefined}
             icon={DollarSign}
           />
         </div>
         <div className="col-span-3">
           <KPICard
             title="Taux d'occupation"
-            value="91.7%"
-            change={-0.5}
-            trend="down"
+            value={isLoading ? '…' : `${kpis?.taux_occupation?.toFixed(1) ?? '—'}%`}
+            change={kpis?.taux_occupation_change}
+            trend={kpis?.taux_occupation_change !== undefined ? (kpis.taux_occupation_change >= 0 ? 'up' : 'down') : undefined}
             icon={TrendingUp}
           />
         </div>
         <div className="col-span-3">
           <KPICard
             title="Biens en portefeuille"
-            value="7"
+            value={isLoading ? '…' : String(kpis?.nb_biens ?? '—')}
             icon={Users}
-            subtitle="3 SCI · 7 locataires"
+            subtitle={data ? `${data.sci_overview.length} SCI · ${data.locataires_actifs} locataires` : undefined}
           />
         </div>
 
         {/* Row 2 — Charts + SCI + Top5 (row-span-3) */}
         <div className="col-span-3">
-          <CashflowChart />
+          <CashflowChart data={data?.cashflow_history} />
         </div>
         <div className="col-span-3">
-          <PatrimoineChart />
+          <PatrimoineChart data={data?.patrimoine_history} />
         </div>
         <div className="col-span-3">
-          <SCIOverview />
+          <SCIOverview data={data?.sci_overview} />
         </div>
         <div className="col-span-3 row-span-3">
-          <Top5Biens />
+          <Top5Biens data={data?.top_biens} />
         </div>
 
         {/* Row 3 — Transactions */}
         <div className="col-span-9">
-          <TransactionsTable />
+          <TransactionsTable data={data?.recent_transactions} />
         </div>
 
         {/* Row 4 — Simulation + Opportunites + Locataires */}
