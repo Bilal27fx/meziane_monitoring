@@ -22,6 +22,7 @@ from app.schemas.transaction_schema import (
     TransactionCreate,
     TransactionUpdate,
     TransactionResponse,
+    TransactionPaginatedResponse,
     TransactionCategorizeRequest,
     TransactionCategorizeResponse,
     AnalyticsCategorieResponse,
@@ -31,34 +32,43 @@ from app.models.transaction import TransactionCategorie, StatutValidation
 from app.services.transaction_service import TransactionService
 from app.services.categorization_service import CategorizationService
 from app.utils.db import get_db
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, CurrentUser
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"], dependencies=[Depends(get_current_user)])
 
 
-@router.get("/", response_model=List[TransactionResponse])
+@router.get("/", response_model=TransactionPaginatedResponse)
 def get_all_transactions(
-    sci_id: Optional[int] = Query(None, description="Filtrer par SCI"),
-    bien_id: Optional[int] = Query(None, description="Filtrer par bien"),
-    categorie: Optional[TransactionCategorie] = Query(None, description="Filtrer par catégorie"),
-    date_debut: Optional[date] = Query(None, description="Date de début"),
-    date_fin: Optional[date] = Query(None, description="Date de fin"),
-    statut_validation: Optional[StatutValidation] = Query(None, description="Filtrer par statut validation"),
-    limit: int = Query(100, ge=1, le=1000, description="Nombre max de résultats"),
-    offset: int = Query(0, ge=0, description="Pagination offset"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=200),
+    sci_id: Optional[int] = Query(None),
+    bien_id: Optional[int] = Query(None),
+    categorie: Optional[TransactionCategorie] = Query(None),
+    date_debut: Optional[date] = Query(None),
+    date_fin: Optional[date] = Query(None),
+    statut: Optional[str] = Query(None, description="Statut: valide, en_attente, rejete"),
     db: Session = Depends(get_db)
-):  # Récupère transactions avec filtres optionnels
+):  # Récupère transactions paginées avec filtres — retourne {items, total, page, per_page, pages}
+    statut_validation = None
+    if statut:
+        try:
+            statut_validation = StatutValidation(statut)
+        except ValueError:
+            pass
     service = TransactionService(db)
-    return service.get_all_transactions(
-        sci_id=sci_id,
-        bien_id=bien_id,
-        categorie=categorie,
-        date_debut=date_debut,
-        date_fin=date_fin,
-        statut_validation=statut_validation,
-        limit=limit,
-        offset=offset
+    limit = per_page
+    offset = (page - 1) * per_page
+    items = service.get_all_transactions(
+        sci_id=sci_id, bien_id=bien_id, categorie=categorie,
+        date_debut=date_debut, date_fin=date_fin,
+        statut_validation=statut_validation, limit=limit, offset=offset,
     )
+    total = service.count_all_transactions(
+        sci_id=sci_id, bien_id=bien_id, categorie=categorie,
+        date_debut=date_debut, date_fin=date_fin, statut_validation=statut_validation,
+    )
+    pages = max(1, (total + per_page - 1) // per_page)
+    return TransactionPaginatedResponse(items=items, total=total, page=page, per_page=per_page, pages=pages)
 
 
 @router.get("/{transaction_id}", response_model=TransactionResponse)
@@ -128,32 +138,26 @@ def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):  # S
 @router.post("/{transaction_id}/valider", response_model=TransactionResponse)
 def valider_transaction(
     transaction_id: int,
-    validateur: str = Query(..., description="Nom du validateur"),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db)
-):  # Valide transaction manuellement
+):  # Valide transaction — validateur = user connecté (RFC-008)
     service = TransactionService(db)
-    transaction = service.valider_transaction(transaction_id, validateur)
+    transaction = service.valider_transaction(transaction_id, str(current_user.id))
     if not transaction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Transaction avec ID {transaction_id} introuvable"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {transaction_id} introuvable")
     return transaction
 
 
 @router.post("/{transaction_id}/rejeter", response_model=TransactionResponse)
 def rejeter_transaction(
     transaction_id: int,
-    validateur: str = Query(..., description="Nom du validateur"),
+    current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db)
-):  # Rejette transaction
+):  # Rejette transaction — validateur = user connecté (RFC-008)
     service = TransactionService(db)
-    transaction = service.rejeter_transaction(transaction_id, validateur)
+    transaction = service.rejeter_transaction(transaction_id, str(current_user.id))
     if not transaction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Transaction avec ID {transaction_id} introuvable"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transaction {transaction_id} introuvable")
     return transaction
 
 

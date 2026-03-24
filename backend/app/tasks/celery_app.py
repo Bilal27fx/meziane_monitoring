@@ -17,6 +17,7 @@ Utilisé par:
 """
 
 from celery import Celery
+from celery.schedules import crontab
 from app.config import settings
 
 celery_app = Celery(
@@ -38,20 +39,18 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     beat_schedule={
-        # Agent prospection : tous les jours à 6h
+        # RFC-008: crontab() au lieu de cron string — compatible Celery standard
         "run-prospection-agent-daily": {
             "task": "app.tasks.agent_tasks.run_prospection_agent_task",
-            "schedule": "0 6 * * *",
+            "schedule": crontab(hour=6, minute=0),
         },
-        # Génération quittances : 1er du mois à 8h
         "generate-quittances-monthly": {
             "task": "app.tasks.quittance_tasks.generate_quittances_task",
-            "schedule": "0 8 1 * *",
+            "schedule": crontab(hour=8, minute=0, day_of_month=1),
         },
-        # Alertes impayés : tous les lundis à 9h
         "send-alerte-impayes-weekly": {
             "task": "app.tasks.quittance_tasks.send_alerte_impayes_task",
-            "schedule": "0 9 * * 1",
+            "schedule": crontab(hour=9, minute=0, day_of_week=1),
         },
     }
 )

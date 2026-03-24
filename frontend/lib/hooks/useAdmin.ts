@@ -149,6 +149,27 @@ export function useRejectTransaction() {
   })
 }
 
+export function useCreateTransaction() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: {
+      date: string; montant: number; libelle: string
+      compte_bancaire_id: string; sci_id: number; categorie?: string
+    }) => api.post('/api/transactions', data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+  })
+}
+
+export function useUpdateTransaction() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: {
+      date?: string; montant?: number; libelle?: string; categorie?: string
+    }}) => api.put(`/api/transactions/${id}`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+  })
+}
+
 // ─── Quittance Hooks ──────────────────────────────────────────────────────────
 
 // ─── Document Hooks ───────────────────────────────────────────────────────────

@@ -36,9 +36,11 @@ class CashflowService:  # Service calcul cashflow et analytics financiers
         bien_id: int,
         annee: Optional[int] = None,
         mois: Optional[int] = None
-    ) -> Dict:  # Calcule cashflow d'un bien spécifique
+    ) -> Dict:  # RFC-008: 1 requête CASE au lieu de 3
         query = self.db.query(
-            func.sum(Transaction.montant).label('total')
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label("revenus"),
+            func.sum(case((Transaction.montant < 0, func.abs(Transaction.montant)), else_=0)).label("depenses"),
+            func.sum(Transaction.montant).label("total"),
         ).filter(Transaction.bien_id == bien_id)
 
         if annee:
@@ -46,38 +48,12 @@ class CashflowService:  # Service calcul cashflow et analytics financiers
         if mois:
             query = query.filter(extract('month', Transaction.date) == mois)
 
-        total = query.scalar() or 0
-
-        # Sépare revenus et dépenses
-        revenus = self.db.query(
-            func.sum(Transaction.montant)
-        ).filter(
-            Transaction.bien_id == bien_id,
-            Transaction.montant > 0
-        )
-        if annee:
-            revenus = revenus.filter(extract('year', Transaction.date) == annee)
-        if mois:
-            revenus = revenus.filter(extract('month', Transaction.date) == mois)
-        revenus_total = revenus.scalar() or 0
-
-        depenses = self.db.query(
-            func.sum(Transaction.montant)
-        ).filter(
-            Transaction.bien_id == bien_id,
-            Transaction.montant < 0
-        )
-        if annee:
-            depenses = depenses.filter(extract('year', Transaction.date) == annee)
-        if mois:
-            depenses = depenses.filter(extract('month', Transaction.date) == mois)
-        depenses_total = abs(depenses.scalar() or 0)
-
+        row = query.one()
         return {
             "bien_id": bien_id,
-            "revenus": float(revenus_total),
-            "depenses": float(depenses_total),
-            "cashflow_net": float(total),
+            "revenus": float(row.revenus or 0),
+            "depenses": float(row.depenses or 0),
+            "cashflow_net": float(row.total or 0),
             "annee": annee,
             "mois": mois
         }
@@ -102,9 +78,11 @@ class CashflowService:  # Service calcul cashflow et analytics financiers
         sci_id: int,
         annee: Optional[int] = None,
         mois: Optional[int] = None
-    ) -> Dict:  # Calcule cashflow d'une SCI
+    ) -> Dict:  # RFC-008: 1 requête CASE au lieu de 3
         query = self.db.query(
-            func.sum(Transaction.montant).label('total')
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label("revenus"),
+            func.sum(case((Transaction.montant < 0, func.abs(Transaction.montant)), else_=0)).label("depenses"),
+            func.sum(Transaction.montant).label("total"),
         ).filter(Transaction.sci_id == sci_id)
 
         if annee:
@@ -112,37 +90,12 @@ class CashflowService:  # Service calcul cashflow et analytics financiers
         if mois:
             query = query.filter(extract('month', Transaction.date) == mois)
 
-        total = query.scalar() or 0
-
-        revenus = self.db.query(
-            func.sum(Transaction.montant)
-        ).filter(
-            Transaction.sci_id == sci_id,
-            Transaction.montant > 0
-        )
-        if annee:
-            revenus = revenus.filter(extract('year', Transaction.date) == annee)
-        if mois:
-            revenus = revenus.filter(extract('month', Transaction.date) == mois)
-        revenus_total = revenus.scalar() or 0
-
-        depenses = self.db.query(
-            func.sum(Transaction.montant)
-        ).filter(
-            Transaction.sci_id == sci_id,
-            Transaction.montant < 0
-        )
-        if annee:
-            depenses = depenses.filter(extract('year', Transaction.date) == annee)
-        if mois:
-            depenses = depenses.filter(extract('month', Transaction.date) == mois)
-        depenses_total = abs(depenses.scalar() or 0)
-
+        row = query.one()
         return {
             "sci_id": sci_id,
-            "revenus": float(revenus_total),
-            "depenses": float(depenses_total),
-            "cashflow_net": float(total),
+            "revenus": float(row.revenus or 0),
+            "depenses": float(row.depenses or 0),
+            "cashflow_net": float(row.total or 0),
             "annee": annee,
             "mois": mois
         }
@@ -166,34 +119,23 @@ class CashflowService:  # Service calcul cashflow et analytics financiers
         self,
         annee: Optional[int] = None,
         mois: Optional[int] = None
-    ) -> Dict:  # Cashflow global (toutes SCI confondues)
-        query = self.db.query(func.sum(Transaction.montant))
+    ) -> Dict:  # RFC-008: 1 requête CASE au lieu de 3
+        query = self.db.query(
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label("revenus"),
+            func.sum(case((Transaction.montant < 0, func.abs(Transaction.montant)), else_=0)).label("depenses"),
+            func.sum(Transaction.montant).label("total"),
+        )
 
         if annee:
             query = query.filter(extract('year', Transaction.date) == annee)
         if mois:
             query = query.filter(extract('month', Transaction.date) == mois)
 
-        total = query.scalar() or 0
-
-        revenus = self.db.query(func.sum(Transaction.montant)).filter(Transaction.montant > 0)
-        if annee:
-            revenus = revenus.filter(extract('year', Transaction.date) == annee)
-        if mois:
-            revenus = revenus.filter(extract('month', Transaction.date) == mois)
-        revenus_total = revenus.scalar() or 0
-
-        depenses = self.db.query(func.sum(Transaction.montant)).filter(Transaction.montant < 0)
-        if annee:
-            depenses = depenses.filter(extract('year', Transaction.date) == annee)
-        if mois:
-            depenses = depenses.filter(extract('month', Transaction.date) == mois)
-        depenses_total = abs(depenses.scalar() or 0)
-
+        row = query.one()
         return {
-            "revenus": float(revenus_total),
-            "depenses": float(depenses_total),
-            "cashflow_net": float(total),
+            "revenus": float(row.revenus or 0),
+            "depenses": float(row.depenses or 0),
+            "cashflow_net": float(row.total or 0),
             "annee": annee,
             "mois": mois
         }

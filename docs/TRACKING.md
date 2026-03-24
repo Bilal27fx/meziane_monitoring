@@ -7,6 +7,8 @@
 
 | ID | Titre | Type | Priorité | Statut | Date ouverture | Date clôture |
 |----|-------|------|----------|--------|----------------|--------------|
+| RFC-008 | Sécurité Auth + Performance suite | refactor | CRITIQUE | Terminé | 2026-03-24 | 2026-03-24 |
+| RFC-007 | Scalabilité & Performance Backend | refactor | CRITIQUE | Terminé | 2026-03-24 | 2026-03-24 |
 | RFC-006 | Suppression totale mock data + branchement API | refactor | CRITIQUE | Terminé | 2026-03-24 | 2026-03-24 |
 | RFC-001 | Fix endpoints validate/reject | bugfix | CRITIQUE | Terminé | 2026-03-24 | 2026-03-24 |
 | RFC-002 | Routes backend quittances | feature | HAUTE | Terminé | 2026-03-24 | 2026-03-24 |
@@ -156,6 +158,8 @@ Hooks concernés : `useSCIs`, `useBiens`, `useLocataires`, `useTransactions`, `u
 
 | Date | RFC | Résumé des changements |
 |------|-----|------------------------|
+| 2026-03-24 | RFC-008 | Celery crontab, token mémoire+sessionStorage, rate limit login Redis, JWT 30min+role, get_current_user 0 DB, refresh rotation+blacklist, logout endpoint, cashflow 3→1 requête×3, quittances joinedload+batch, detect_duplicates limit(1), gpt-4o-mini, max_retries tasks |
+| 2026-03-24 | RFC-007 | Index DB (14 index), pool_size=20, dashboard KPI -2 requêtes, cashflow 30j GROUP BY SQL, top biens ORDER BY SQL, timeouts httpx, asyncio.run(), health check réel |
 | 2026-03-24 | RFC-001 | `useAdmin.ts` — `/validate` → `/valider`, `/reject` → `/rejeter` |
 | 2026-03-24 | RFC-002 | `quittance_routes.py` + `quittance_schema.py` créés, router enregistré dans `main.py` |
 | 2026-03-24 | RFC-003 | `LocataireForm.tsx` — input file + handler + upload `FormData` vers `/api/documents/upload-locataire` |

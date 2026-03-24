@@ -34,24 +34,20 @@ def sync_banking_task(self, sci_id: int, account_id: int, since: str = None, unt
     try:
         connector = BankingConnectorService()
 
-        # Exécute les coroutines async dans le contexte Celery (sync)
-        loop = asyncio.new_event_loop()
-        try:
-            authenticated = loop.run_until_complete(connector.authenticate())
+        # RFC-007: asyncio.run() remplace new_event_loop() manuel — cleanup automatique
+        async def _run():
+            authenticated = await connector.authenticate()
             if not authenticated:
                 raise ValueError("Échec authentification Bridge")
-
-            result = loop.run_until_complete(
-                connector.import_transactions_to_db(
-                    sci_id=sci_id,
-                    account_id=account_id,
-                    db_session=db,
-                    since=since,
-                    until=until,
-                )
+            return await connector.import_transactions_to_db(
+                sci_id=sci_id,
+                account_id=account_id,
+                db_session=db,
+                since=since,
+                until=until,
             )
-        finally:
-            loop.close()
+
+        result = asyncio.run(_run())
 
         logger.info(f"sync_banking_task terminé: {result}")
         return result

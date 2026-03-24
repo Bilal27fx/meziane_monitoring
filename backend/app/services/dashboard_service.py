@@ -40,21 +40,21 @@ class DashboardService:
     # === KPI PRINCIPAL ===
 
     def get_kpi(self) -> Dict:
-        """Calcule tous les KPI principaux du dashboard"""
+        """Calcule tous les KPI principaux du dashboard (RFC-007: patrimoine calculé 1 seule fois)"""
 
-        # 1. Patrimoine Net
+        # 1. Patrimoine Net — calculé une seule fois, réutilisé par performance_ytd
         patrimoine_net = self._calculate_patrimoine_net()
 
         # 2. Cashflow Today (cumul du mois en cours)
         cashflow_today = self._calculate_cashflow_today()
 
-        # 3. Alertes
+        # 3. Alertes (1 requête UNION)
         nb_alertes = self._count_alertes()
 
-        # 4. Performance YTD (Year To Date)
-        performance_ytd = self._calculate_performance_ytd()
+        # 4. Performance YTD — reçoit patrimoine déjà calculé (évite la requête dupliquée)
+        performance_ytd = self._calculate_performance_ytd(patrimoine_net)
 
-        # 5. Taux d'occupation
+        # 5. Taux d'occupation (1 requête CASE)
         taux_occupation = self._calculate_taux_occupation()
 
         # 6. Nombre de locataires actifs
@@ -94,49 +94,38 @@ class DashboardService:
         return float(result or 0)
 
     def _count_alertes(self) -> int:
-        """Compte les alertes actives (loyers impayés + nouvelles opportunités)"""
+        """Compte les alertes actives — 1 requête UNION au lieu de 2 (RFC-007)"""
+        from sqlalchemy import union_all, literal, select as sa_select
 
-        # Loyers impayés
-        nb_impayes = self.db.query(func.count(Quittance.id)).filter(
+        q_impayes = sa_select(literal(1)).where(
             Quittance.statut.in_([StatutQuittance.IMPAYE, StatutQuittance.PARTIEL])
-        ).scalar() or 0
-
-        # Nouvelles opportunités (non vues)
-        nb_opportunites = self.db.query(func.count(Opportunite.id)).filter(
+        )
+        q_opps = sa_select(literal(1)).where(
             Opportunite.statut == StatutOpportunite.NOUVEAU
+        )
+        total = self.db.execute(
+            sa_select(func.count()).select_from(union_all(q_impayes, q_opps).subquery())
         ).scalar() or 0
+        return total
 
-        return nb_impayes + nb_opportunites
-
-    def _calculate_performance_ytd(self) -> float:
-        """Performance année en cours (rentabilité nette moyenne)"""
-        current_year = datetime.now().year
-
-        # Cashflow net YTD
-        cashflow_ytd = self.cashflow_service.get_global_cashflow(current_year)
-        cashflow_net = cashflow_ytd.get("cashflow_net", 0)
-
-        # Patrimoine
-        patrimoine = self._calculate_patrimoine_net()
-
+    def _calculate_performance_ytd(self, patrimoine: float) -> float:
+        """Performance année en cours — reçoit patrimoine déjà calculé pour éviter le doublon (RFC-007)"""
         if patrimoine == 0:
             return 0.0
-
-        # Rentabilité = (cashflow_net / patrimoine) * 100
+        current_year = datetime.now().year
+        cashflow_ytd = self.cashflow_service.get_global_cashflow(current_year)
+        cashflow_net = cashflow_ytd.get("cashflow_net", 0)
         return (cashflow_net / patrimoine) * 100
 
     def _calculate_taux_occupation(self) -> float:
-        """Taux d'occupation (% biens loués)"""
-        total_biens = self.db.query(func.count(Bien.id)).scalar() or 0
-
-        if total_biens == 0:
+        """Taux d'occupation — 1 requête CASE au lieu de 2 (RFC-007)"""
+        row = self.db.query(
+            func.count(Bien.id).label("total"),
+            func.sum(case((Bien.statut == StatutBien.LOUE, 1), else_=0)).label("loues"),
+        ).one()
+        if not row.total:
             return 0.0
-
-        biens_loues = self.db.query(func.count(Bien.id)).filter(
-            Bien.statut == StatutBien.LOUE
-        ).scalar() or 0
-
-        return (biens_loues / total_biens) * 100
+        return (row.loues / row.total) * 100
 
     def _count_locataires_actifs(self) -> int:
         """Nombre de locataires avec bail actif"""
@@ -147,49 +136,36 @@ class DashboardService:
     # === CASHFLOW 30 DERNIERS JOURS ===
 
     def get_cashflow_30days(self) -> List[Dict]:
-        """Retourne données cashflow pour les 30 derniers jours"""
+        """Cashflow 30 derniers jours — GROUP BY SQL au lieu d'agrégation Python (RFC-007)"""
         today = date.today()
         date_debut = today - timedelta(days=30)
 
-        # Récupère toutes les transactions des 30 derniers jours
-        transactions = self.db.query(Transaction).filter(
+        rows = self.db.query(
+            func.cast(Transaction.date, type_=func.date(Transaction.date).type).label("jour"),
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label("revenus"),
+            func.sum(case((Transaction.montant < 0, func.abs(Transaction.montant)), else_=0)).label("depenses"),
+            func.sum(Transaction.montant).label("net"),
+        ).filter(
             Transaction.date >= date_debut,
-            Transaction.date <= today
-        ).order_by(Transaction.date).all()
+            Transaction.date <= today,
+        ).group_by(func.cast(Transaction.date, type_=func.date(Transaction.date).type)).order_by("jour").all()
 
-        # Agrège par jour
-        daily_data = {}
-        for tx in transactions:
-            day_key = tx.date.isoformat()
-            if day_key not in daily_data:
-                daily_data[day_key] = {
-                    "date": day_key,
-                    "revenus": 0.0,
-                    "depenses": 0.0,
-                    "net": 0.0
-                }
+        daily_data = {
+            str(r.jour): {
+                "date": str(r.jour),
+                "revenus": float(r.revenus or 0),
+                "depenses": float(r.depenses or 0),
+                "net": float(r.net or 0),
+            }
+            for r in rows
+        }
 
-            if tx.montant > 0:
-                daily_data[day_key]["revenus"] += tx.montant
-            else:
-                daily_data[day_key]["depenses"] += abs(tx.montant)
-
-            daily_data[day_key]["net"] += tx.montant
-
-        # Rempli les jours manquants avec des zéros
+        # Remplit les jours sans transaction avec des zéros
         result = []
         current = date_debut
         while current <= today:
             day_key = current.isoformat()
-            if day_key in daily_data:
-                result.append(daily_data[day_key])
-            else:
-                result.append({
-                    "date": day_key,
-                    "revenus": 0.0,
-                    "depenses": 0.0,
-                    "net": 0.0
-                })
+            result.append(daily_data.get(day_key, {"date": day_key, "revenus": 0.0, "depenses": 0.0, "net": 0.0}))
             current += timedelta(days=1)
 
         return result
@@ -265,45 +241,51 @@ class DashboardService:
     # === TOP 5 BIENS PAR RENTABILITÉ ===
 
     def get_top_biens_by_rentabilite(self, limit: int = 5) -> List[Dict]:
-        """Top biens par rentabilité — 2 requêtes au lieu de N×3"""
+        """Top biens par rentabilité — tri et LIMIT côté SQL, pas en Python (RFC-007)"""
+        from sqlalchemy import Float, cast, literal_column
         current_year = datetime.now().year
 
-        # 1. Cashflow annuel par bien (1 requête GROUP BY)
-        cashflow_rows = self.db.query(
+        # Cashflow annuel par bien
+        cf_sub = self.db.query(
             Transaction.bien_id,
-            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label('revenus'),
-            func.sum(case((Transaction.montant < 0, Transaction.montant), else_=0)).label('depenses'),
-            func.sum(Transaction.montant).label('cashflow_net'),
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label("revenus"),
+            func.sum(Transaction.montant).label("cashflow_net"),
         ).filter(
             Transaction.bien_id.isnot(None),
-            extract('year', Transaction.date) == current_year,
-        ).group_by(Transaction.bien_id).all()
-        cashflow_map = {r.bien_id: r for r in cashflow_rows}
+            extract("year", Transaction.date) == current_year,
+        ).group_by(Transaction.bien_id).subquery()
 
-        # 2. Biens avec valeur (1 requête)
-        biens = self.db.query(Bien).filter(Bien.valeur_actuelle.isnot(None)).all()
+        # Joint avec Bien, calcule rentabilite_nette en SQL, ORDER BY + LIMIT
+        rows = self.db.query(
+            Bien.id,
+            Bien.adresse,
+            Bien.ville,
+            Bien.type_bien,
+            Bien.valeur_actuelle,
+            cf_sub.c.revenus,
+            cf_sub.c.cashflow_net,
+            (cf_sub.c.cashflow_net / Bien.valeur_actuelle * 100).label("rentabilite_nette"),
+            (cf_sub.c.revenus / Bien.valeur_actuelle * 100).label("rentabilite_brute"),
+        ).outerjoin(cf_sub, Bien.id == cf_sub.c.bien_id).filter(
+            Bien.valeur_actuelle.isnot(None),
+            Bien.valeur_actuelle > 0,
+        ).order_by(
+            desc("rentabilite_nette")
+        ).limit(limit).all()
 
-        result = []
-        for bien in biens:
-            cf = cashflow_map.get(bien.id)
-            revenus = float(cf.revenus or 0) if cf else 0
-            cashflow_net = float(cf.cashflow_net or 0) if cf else 0
-            valeur = float(bien.valeur_actuelle)
-            rentabilite_brute = (revenus / valeur * 100) if valeur > 0 else 0
-            rentabilite_nette = (cashflow_net / valeur * 100) if valeur > 0 else 0
-            result.append({
-                "id": bien.id,
-                "adresse": bien.adresse,
-                "ville": bien.ville,
-                "type_bien": bien.type_bien.value,
-                "valeur_actuelle": valeur,
-                "rentabilite_brute": round(rentabilite_brute, 2),
-                "rentabilite_nette": round(rentabilite_nette, 2),
-                "cashflow_annuel": cashflow_net,
-            })
-
-        result.sort(key=lambda x: x["rentabilite_nette"], reverse=True)
-        return result[:limit]
+        return [
+            {
+                "id": r.id,
+                "adresse": r.adresse,
+                "ville": r.ville,
+                "type_bien": r.type_bien.value,
+                "valeur_actuelle": float(r.valeur_actuelle),
+                "rentabilite_brute": round(float(r.rentabilite_brute or 0), 2),
+                "rentabilite_nette": round(float(r.rentabilite_nette or 0), 2),
+                "cashflow_annuel": float(r.cashflow_net or 0),
+            }
+            for r in rows
+        ]
 
     # === VUE D'ENSEMBLE SCI ===
 

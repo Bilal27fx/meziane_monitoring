@@ -11,9 +11,9 @@
   --color-border-default: #262626;
   --color-border-hover: #404040;
   --color-text-primary: #ffffff;
-  --color-text-secondary: #a3a3a3;
-  --color-text-muted: #737373;
-  --color-text-faint: #525252;
+  --color-text-secondary: #d4d4d4;
+  --color-text-muted: #a3a3a3;
+  --color-text-faint: #737373;
   --color-positive: #22c55e;
   --color-negative: #ef4444;
   --color-neutral: #3b82f6;
@@ -27,11 +27,13 @@ body {
   color: #ffffff;
   font-family: 'Inter Variable', sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: #0a0a0a; }
-::-webkit-scrollbar-thumb { background: #262626; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: #404040; }
+::-webkit-scrollbar-thumb { background: #333333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4d4d4d; }
 
 .recharts-tooltip-wrapper { outline: none !important; }

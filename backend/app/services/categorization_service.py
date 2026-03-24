@@ -78,7 +78,7 @@ Réponds UNIQUEMENT avec le JSON, aucun texte supplémentaire."""
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o-mini",  # RFC-008: 100x moins cher, aussi précis pour la classification
                 messages=[
                     {"role": "system", "content": "Tu es un expert comptable immobilier. Tu réponds uniquement en JSON."},
                     {"role": "user", "content": prompt}

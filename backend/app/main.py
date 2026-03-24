@@ -16,6 +16,7 @@ Utilisé par:
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from app.config import settings
 from app.utils.logger import setup_logger
 from app.api import sci_routes, bien_routes, transaction_routes, banking_routes, cashflow_routes, opportunite_routes, locataire_routes, document_routes, dashboard_routes, quittance_routes
@@ -85,12 +86,22 @@ def read_root():  # Health check endpoint
 
 
 @app.get("/health")
-def health_check():  # Health check détaillé
-    return {
-        "status": "healthy",
-        "database": "connected",
-        "redis": "connected"
-    }
+def health_check():  # RFC-007: health check réel — teste DB, retourne 503 si down
+    from app.utils.db import SessionLocal
+    db_status = "connected"
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+    except Exception:
+        db_status = "error"
+
+    status_code = 200 if db_status == "connected" else 503
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "healthy" if db_status == "connected" else "degraded", "database": db_status}
+    )
 
 
 if __name__ == "__main__":

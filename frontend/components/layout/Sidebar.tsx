@@ -6,16 +6,18 @@ import { useState, useRef, useEffect } from 'react'
 import { LayoutGrid, Zap, Settings2, LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { tokenStore } from '@/lib/api/client'
 
 const NAV_ITEMS = [
   { href: '/dashboard', icon: LayoutGrid, label: 'Dashboard' },
   { href: '/agent', icon: Zap, label: 'Agent IA' },
-  { href: '/admin', icon: Settings2, label: 'Administration' },
+  { href: '/admin', icon: Settings2, label: 'Administration', adminOnly: true },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const { logout } = useAuth()
+  const role = tokenStore.getRole()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -42,7 +44,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex flex-col items-center gap-1 pt-2 flex-1">
-        {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+        {NAV_ITEMS.filter(item => !item.adminOnly || role === 'admin').map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link

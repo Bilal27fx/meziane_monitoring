@@ -193,41 +193,85 @@ export interface User {
 
 export interface DashboardKPIs {
   patrimoine_net: number
-  patrimoine_net_change: number
-  cashflow_mensuel: number
-  cashflow_mensuel_change: number
+  cashflow_today: number
+  nb_alertes: number
+  performance_ytd: number
   taux_occupation: number
-  taux_occupation_change: number
-  nb_biens: number
-  nb_biens_change: number
+  nb_locataires_actifs: number
+}
+
+export interface DashboardTransaction {
+  id: number
+  date: string
+  montant: number
+  libelle: string
+  categorie?: string
+  sci_nom?: string
+  bien_adresse?: string
+  statut_validation: string
 }
 
 export interface DashboardFull {
-  kpis: DashboardKPIs
-  cashflow_history: { date: string; value: number }[]
-  patrimoine_history: { date: string; value: number }[]
+  kpi: DashboardKPIs
+  cashflow_30days: { date: string; revenus: number; depenses: number; net: number }[]
+  patrimoine_12months: { date: string; valeur: number }[]
   top_biens: TopBien[]
-  recent_transactions: Transaction[]
+  recent_transactions: DashboardTransaction[]
   sci_overview: SCIOverviewItem[]
-  opportunites_count: number
-  locataires_actifs: number
+  locataires: unknown[]
+  opportunites: unknown[]
 }
 
 export interface TopBien {
   id: number
   adresse: string
-  sci_nom: string
-  valeur: number
-  tri_net: number
-  rank: number
+  ville: string
+  type_bien: string
+  valeur_actuelle: number
+  rentabilite_brute: number
+  rentabilite_nette: number
+  cashflow_annuel: number
 }
 
 export interface SCIOverviewItem {
   id: number
   nom: string
-  cashflow_mensuel: number
+  siret?: string
   nb_biens: number
-  valeur_totale: number
+  valeur_patrimoniale: number
+  cashflow_annuel: number
+  revenus_annuels: number
+  depenses_annuelles: number
+}
+
+export interface LocataireOverview {
+  id: number
+  nom: string
+  prenom: string
+  email?: string
+  telephone?: string
+  bien_adresse?: string
+  loyer_mensuel: number
+  statut_paiement: string
+  nb_impayes: number
+  date_debut_bail: string
+}
+
+export interface OpportuniteOverview {
+  id: number
+  titre?: string
+  ville: string
+  prix: number
+  surface?: number
+  prix_m2?: number
+  nb_pieces?: number
+  score_global?: number
+  rentabilite_brute?: number
+  rentabilite_nette?: number
+  source: string
+  url_annonce: string
+  date_detection: string
+  statut: string
 }
 
 // ─── Agent / Task ────────────────────────────────────────────────────────────

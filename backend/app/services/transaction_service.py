@@ -57,6 +57,30 @@ class TransactionService:  # Service gestion transactions bancaires
 
         return query.order_by(Transaction.date.desc()).limit(limit).offset(offset).all()
 
+    def count_all_transactions(
+        self,
+        sci_id: Optional[int] = None,
+        bien_id: Optional[int] = None,
+        categorie: Optional[TransactionCategorie] = None,
+        date_debut: Optional[date] = None,
+        date_fin: Optional[date] = None,
+        statut_validation: Optional[StatutValidation] = None,
+    ) -> int:
+        query = self.db.query(func.count(Transaction.id))
+        if sci_id:
+            query = query.filter(Transaction.sci_id == sci_id)
+        if bien_id:
+            query = query.filter(Transaction.bien_id == bien_id)
+        if categorie:
+            query = query.filter(Transaction.categorie == categorie)
+        if date_debut:
+            query = query.filter(Transaction.date >= date_debut)
+        if date_fin:
+            query = query.filter(Transaction.date <= date_fin)
+        if statut_validation:
+            query = query.filter(Transaction.statut_validation == statut_validation)
+        return query.scalar() or 0
+
     def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:  # Récupère transaction par ID
         return self.db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
@@ -162,7 +186,7 @@ class TransactionService:  # Service gestion transactions bancaires
             for mois, total in results
         }
 
-    def detect_duplicates(self, transaction_data: TransactionCreate) -> List[Transaction]:  # Détecte doublons potentiels
+    def detect_duplicates(self, transaction_data: TransactionCreate) -> List[Transaction]:  # RFC-008: .limit(1) évite de charger tous les doublons
         return self.db.query(Transaction).filter(
             and_(
                 Transaction.date == transaction_data.date,
@@ -170,4 +194,4 @@ class TransactionService:  # Service gestion transactions bancaires
                 Transaction.libelle == transaction_data.libelle,
                 Transaction.sci_id == transaction_data.sci_id
             )
-        ).all()
+        ).limit(1).all()
