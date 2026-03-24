@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Trash2, Plus, ClipboardList, MessageSquare } from 'lucide-react'
+import { Pencil, Trash2, Plus, ClipboardList, MessageSquare, FolderOpen } from 'lucide-react'
 import { useLocataires, useDeleteLocataire } from '@/lib/hooks/useAdmin'
 import DataTable, { Column } from '@/components/ui/DataTable'
 import Modal from '@/components/ui/Modal'
 import LocataireForm from '@/components/admin/forms/LocataireForm'
 import QuittancesPanel from '@/components/admin/panels/QuittancesPanel'
+import DocumentsPanel from '@/components/admin/panels/DocumentsPanel'
 import Badge from '@/components/ui/Badge'
 import { formatCurrency } from '@/lib/utils/format'
 import toast from 'react-hot-toast'
@@ -22,6 +23,8 @@ export default function LocatairesTab() {
   const [confirmDelete, setConfirmDelete] = useState<Locataire | null>(null)
   const [quittancesOpen, setQuittancesOpen] = useState(false)
   const [selectedLocataire, setSelectedLocataire] = useState<Locataire | null>(null)
+  const [docsOpen, setDocsOpen] = useState(false)
+  const [docsLocataire, setDocsLocataire] = useState<Locataire | null>(null)
 
   const paiementVariant = (statut?: string) => {
     if (statut === 'a_jour') return 'ok' as const
@@ -43,16 +46,16 @@ export default function LocatairesTab() {
       </div>
     )},
     { header: 'Bien', accessor: 'bien_id', render: (l) => (
-      <span className="text-xs text-[#a3a3a3]">{l.bien?.adresse ?? (l.bien_id ? `Bien #${l.bien_id}` : '—')}</span>
+      <span className="text-xs text-[#a3a3a3]">{l.bail?.bien_adresse ?? (l.bien_id ? `Bien #${l.bien_id}` : '—')}</span>
     )},
     { header: 'Bail', accessor: 'bail', render: (l) => (
       <span className="text-[10px] font-mono text-[#737373]">
         {l.bail ? `${new Date(l.bail.date_debut).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })} →` : '—'}
       </span>
     )},
-    { header: 'Loyer', accessor: 'loyer', render: (l) => (
+    { header: 'Loyer', accessor: 'bail', render: (l) => (
       <span className="font-mono text-xs text-white tabular-nums">
-        {l.bail ? formatCurrency(l.bail.loyer) + '/m' : '—'}
+        {l.bail ? formatCurrency(l.bail.loyer_mensuel) + '/m' : '—'}
       </span>
     )},
     { header: 'Paiement', accessor: 'statut_paiement', render: (l) => (
@@ -67,6 +70,9 @@ export default function LocatairesTab() {
         </button>
         <button onClick={() => { setSelectedLocataire(l); setQuittancesOpen(true) }} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#3b82f6] hover:bg-[#3b82f6]/10 transition-colors" title="Quittances">
           <ClipboardList className="h-3 w-3" />
+        </button>
+        <button onClick={() => { setDocsLocataire(l); setDocsOpen(true) }} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#a855f7] hover:bg-[#a855f7]/10 transition-colors" title="Documents">
+          <FolderOpen className="h-3 w-3" />
         </button>
         <button onClick={() => toast.success('Fonctionnalité communication à venir')} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#eab308] hover:bg-[#eab308]/10 transition-colors" title="Communication">
           <MessageSquare className="h-3 w-3" />
@@ -118,6 +124,14 @@ export default function LocatairesTab() {
         onClose={() => setQuittancesOpen(false)}
         locataireNom={selectedLocataire ? `${selectedLocataire.prenom} ${selectedLocataire.nom}` : undefined}
         locataireId={selectedLocataire?.id ?? null}
+      />
+
+      <DocumentsPanel
+        open={docsOpen}
+        onClose={() => setDocsOpen(false)}
+        entityType="locataire"
+        entityId={docsLocataire?.id ?? null}
+        entityNom={docsLocataire ? `${docsLocataire.prenom} ${docsLocataire.nom}` : undefined}
       />
     </div>
   )

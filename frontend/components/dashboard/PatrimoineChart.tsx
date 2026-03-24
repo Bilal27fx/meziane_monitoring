@@ -14,10 +14,6 @@ interface PatrimoineChartProps {
 
 const MONTHS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
 
-const DEFAULT_DATA: DataPoint[] = Array.from({ length: 12 }, (_, i) => ({
-  date: new Date(2025, i, 1).toISOString().split('T')[0],
-  value: 2_200_000 + i * 18_500 + Math.round(Math.random() * 12_000 - 6_000),
-}))
 
 function formatLabel(dateStr: string) {
   const d = new Date(dateStr)
@@ -38,7 +34,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   )
 }
 
-export default function PatrimoineChart({ data = DEFAULT_DATA }: PatrimoineChartProps) {
+export default function PatrimoineChart({ data = [] }: PatrimoineChartProps) {
   return (
     <div className="h-48 p-2 bg-[#111111] border border-[#262626] rounded-md flex flex-col">
       <div className="flex items-center justify-between mb-1">
@@ -48,7 +44,7 @@ export default function PatrimoineChart({ data = DEFAULT_DATA }: PatrimoineChart
         </span>
       </div>
       <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
           <LineChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" vertical={false} />
             <XAxis

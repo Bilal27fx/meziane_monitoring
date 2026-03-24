@@ -1,7 +1,8 @@
 'use client'
 
 import { X, Download, FileText } from 'lucide-react'
-import { useQuittances } from '@/lib/hooks/useAdmin'
+import { useQuittances, useGenerateQuittance } from '@/lib/hooks/useAdmin'
+import api from '@/lib/api/client'
 import Badge from '@/components/ui/Badge'
 import { formatCurrency } from '@/lib/utils/format'
 import toast from 'react-hot-toast'
@@ -28,15 +29,29 @@ function statutLabel(statut: Quittance['statut']): string {
 
 export default function QuittancesPanel({ open, onClose, locataireNom, locataireId }: Props) {
   const { data: quittances = [], isLoading } = useQuittances(locataireId)
+  const generateQuittance = useGenerateQuittance()
 
   if (!open) return null
 
-  const handleDownload = (mois: string) => {
-    toast.success(`Quittance ${mois} téléchargée`)
+  const handleDownload = async (quittanceId: number, mois: string) => {
+    try {
+      const response = await api.get(`/api/quittances/${quittanceId}/pdf`, { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data as Blob)
+      window.open(url, '_blank')
+      toast.success(`Quittance ${mois} téléchargée`)
+    } catch {
+      toast.error('Aucun PDF disponible pour cette quittance')
+    }
   }
 
-  const handleGenerate = () => {
-    toast.success('Quittance générée et envoyée par email')
+  const handleGenerate = async () => {
+    if (!locataireId) return
+    try {
+      await generateQuittance.mutateAsync(locataireId)
+      toast.success('Quittance générée')
+    } catch {
+      toast.error('Erreur lors de la génération')
+    }
   }
 
   return (
@@ -102,7 +117,7 @@ export default function QuittancesPanel({ open, onClose, locataireNom, locataire
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <button
-                        onClick={() => handleDownload(q.mois)}
+                        onClick={() => handleDownload(q.id, q.mois)}
                         className="flex items-center gap-1 px-1.5 py-1 text-[9px] text-[#737373] hover:text-white hover:bg-[#262626] rounded transition-colors ml-auto"
                       >
                         <Download className="h-3 w-3" />
@@ -120,10 +135,11 @@ export default function QuittancesPanel({ open, onClose, locataireNom, locataire
         <div className="px-4 py-3 border-t border-[#262626]">
           <button
             onClick={handleGenerate}
-            className="w-full h-8 flex items-center justify-center gap-1.5 bg-white text-black text-xs font-medium rounded hover:bg-[#e5e5e5] transition-colors"
+            disabled={generateQuittance.isPending}
+            className="w-full h-8 flex items-center justify-center gap-1.5 bg-white text-black text-xs font-medium rounded hover:bg-[#e5e5e5] transition-colors disabled:opacity-50"
           >
             <FileText className="h-3.5 w-3.5" />
-            Générer quittance
+            {generateQuittance.isPending ? 'Génération…' : 'Générer quittance'}
           </button>
         </div>
       </div>

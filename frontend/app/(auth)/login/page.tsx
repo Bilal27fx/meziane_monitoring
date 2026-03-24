@@ -77,7 +77,7 @@ export default function LoginPage() {
 
         <div className="mt-6 pt-4 border-t border-[#262626] text-center">
           <p className="text-[9px] text-[#404040]">
-            Pour tester : admin@meziane.fr / admin123
+            Pour tester : admin@meziane.fr / admin1234
           </p>
         </div>
       </div>

@@ -18,8 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import settings
 from app.utils.logger import setup_logger
-from app.api import sci_routes, bien_routes, transaction_routes, banking_routes, cashflow_routes, opportunite_routes, locataire_routes, document_routes, dashboard_routes
-from app.api import auth_routes
+from app.api import sci_routes, bien_routes, transaction_routes, banking_routes, cashflow_routes, opportunite_routes, locataire_routes, document_routes, dashboard_routes, quittance_routes
+from app.api import auth_routes, user_routes
 
 # Import tous les modèles pour SQLAlchemy
 from app.models import sci, bien, transaction, locataire, bail, quittance, document, document_extraction, opportunite, simulation, user
@@ -61,6 +61,7 @@ PluginRegistry.register(ImmobilierPlugin())
 # PluginRegistry.register(CommercialAlgeriePlugin())  # Décommenter quand prêt
 
 app.include_router(auth_routes.router)      # Routes Auth (publiques — pas de Depends auth)
+app.include_router(user_routes.router)      # Routes Users (admin only)
 app.include_router(dashboard_routes.router)  # Routes Dashboard
 app.include_router(sci_routes.router)        # Routes SCI
 app.include_router(bien_routes.router)       # Routes Biens
@@ -70,6 +71,7 @@ app.include_router(cashflow_routes.router)   # Routes Cashflow
 app.include_router(opportunite_routes.router)  # Routes Opportunités
 app.include_router(locataire_routes.router)  # Routes Locataires
 app.include_router(document_routes.router)   # Routes Documents
+app.include_router(quittance_routes.router)  # Routes Quittances
 
 
 @app.get("/")

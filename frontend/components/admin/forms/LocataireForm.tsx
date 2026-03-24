@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { Upload } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Upload, X, Paperclip } from 'lucide-react'
 import { useCreateLocataire, useUpdateLocataire, useBiens } from '@/lib/hooks/useAdmin'
+import api from '@/lib/api/client'
 import toast from 'react-hot-toast'
-import type { Locataire, LocataireFormData } from '@/lib/types'
+import type { Locataire, LocataireFormData, BailFormData, TypeDocument } from '@/lib/types'
+import { TYPE_DOCUMENT_LABELS } from '@/lib/types'
 
 interface Props {
   locataire?: Locataire
@@ -21,6 +23,8 @@ export default function LocataireForm({ locataire, onClose }: Props) {
   const { data: biensData } = useBiens()
   const biens = biensData?.items ?? []
 
+  const existingBail = locataire?.bail
+
   const [form, setForm] = useState<LocataireFormData>({
     prenom: locataire?.prenom ?? '',
     nom: locataire?.nom ?? '',
@@ -29,28 +33,76 @@ export default function LocataireForm({ locataire, onClose }: Props) {
     date_naissance: locataire?.date_naissance ?? '',
     profession: locataire?.profession ?? '',
     revenus_annuels: locataire?.revenus_annuels ?? undefined,
-    bien_id: locataire?.bien_id ?? undefined,
-    date_debut: locataire?.bail?.date_debut ?? '',
-    date_fin: locataire?.bail?.date_fin ?? '',
-    loyer: locataire?.bail?.loyer ?? undefined,
-    charges: locataire?.bail?.charges ?? undefined,
-    depot_garantie: locataire?.bail?.depot_garantie ?? undefined,
-    type_revision: locataire?.bail?.type_revision ?? 'IRL',
+    bail: existingBail ? {
+      bien_id: existingBail.bien_id,
+      date_debut: existingBail.date_debut,
+      date_fin: existingBail.date_fin ?? '',
+      loyer_mensuel: existingBail.loyer_mensuel,
+      charges_mensuelles: existingBail.charges_mensuelles,
+      depot_garantie: existingBail.depot_garantie,
+    } : undefined,
   })
+
+  const [hasBail, setHasBail] = useState(!!existingBail)
+  const [pendingFiles, setPendingFiles] = useState<Array<{ file: File; type: TypeDocument }>>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const set = <K extends keyof LocataireFormData>(key: K, value: LocataireFormData[K]) => {
     setForm((f) => ({ ...f, [key]: value }))
   }
 
+  const setBail = <K extends keyof BailFormData>(key: K, value: BailFormData[K]) => {
+    setForm((f) => ({
+      ...f,
+      bail: { ...(f.bail ?? { bien_id: 0, date_debut: '', loyer_mensuel: 0, charges_mensuelles: 0 }), [key]: value },
+    }))
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    const newEntries = files.map((file) => ({ file, type: 'autre' as TypeDocument }))
+    setPendingFiles((prev) => [...prev, ...newEntries])
+    e.target.value = ''
+  }
+
+  const removeFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const updateFileType = (index: number, type: TypeDocument) => {
+    setPendingFiles((prev) => prev.map((entry, i) => i === index ? { ...entry, type } : entry))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const bail = hasBail && form.bail
+      ? { ...form.bail, date_fin: form.bail.date_fin || null }
+      : undefined
+    const payload: LocataireFormData = {
+      ...form,
+      telephone: form.telephone || null,
+      date_naissance: form.date_naissance || null,
+      profession: form.profession || null,
+      bail,
+    }
     try {
+      let locataireId: number
       if (locataire) {
-        await updateLocataire.mutateAsync({ id: locataire.id, data: form })
+        await updateLocataire.mutateAsync({ id: locataire.id, data: payload })
+        locataireId = locataire.id
         toast.success('Locataire mis à jour')
       } else {
-        await createLocataire.mutateAsync(form)
+        const res = await createLocataire.mutateAsync(payload)
+        locataireId = (res.data as { id: number }).id
         toast.success('Locataire créé')
+      }
+      // Upload des documents en attente
+      for (const { file, type } of pendingFiles) {
+        const fd = new FormData()
+        fd.append('locataire_id', String(locataireId))
+        fd.append('type_document', type)
+        fd.append('file', file)
+        await api.post('/api/documents/upload-locataire', fd, { headers: { 'Content-Type': undefined } })
       }
       onClose()
     } catch {
@@ -59,6 +111,7 @@ export default function LocataireForm({ locataire, onClose }: Props) {
   }
 
   const isPending = createLocataire.isPending || updateLocataire.isPending
+  const bail = form.bail
 
   return (
     <form onSubmit={handleSubmit} className="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
@@ -142,93 +195,140 @@ export default function LocataireForm({ locataire, onClose }: Props) {
       </div>
 
       {/* Bail */}
-      <p className={sectionClass}>Bail</p>
-      <div>
-        <label className={labelClass}>Bien *</label>
-        <select
-          value={form.bien_id ?? ''}
-          onChange={(e) => set('bien_id', Number(e.target.value) || undefined)}
-          className={inputClass}
-          required
-        >
-          <option value="">Sélectionner un bien</option>
-          {biens.map((b) => (
-            <option key={b.id} value={b.id}>{b.adresse} — {b.ville}</option>
-          ))}
-        </select>
+      <div className="flex items-center gap-2 mt-4">
+        <p className={sectionClass + ' flex-1 mb-0 border-0'}>Bail</p>
+        <label className="flex items-center gap-1.5 text-[9px] text-[#525252] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hasBail}
+            onChange={(e) => {
+              setHasBail(e.target.checked)
+              if (e.target.checked && !form.bail) {
+                setForm((f) => ({ ...f, bail: { bien_id: 0, date_debut: '', loyer_mensuel: 0, charges_mensuelles: 0 } }))
+              }
+            }}
+            className="accent-white"
+          />
+          Associer un bail
+        </label>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className={labelClass}>Date début *</label>
-          <input
-            type="date"
-            value={form.date_debut ?? ''}
-            onChange={(e) => set('date_debut', e.target.value)}
-            className={inputClass}
-            required
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Date fin</label>
-          <input
-            type="date"
-            value={form.date_fin ?? ''}
-            onChange={(e) => set('date_fin', e.target.value)}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Loyer (€) *</label>
-          <input
-            type="number"
-            value={form.loyer ?? ''}
-            onChange={(e) => set('loyer', Number(e.target.value) || undefined)}
-            className={inputClass}
-            required
-            placeholder="1200"
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Charges (€)</label>
-          <input
-            type="number"
-            value={form.charges ?? ''}
-            onChange={(e) => set('charges', Number(e.target.value) || undefined)}
-            className={inputClass}
-            placeholder="150"
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Dépôt garantie (€)</label>
-          <input
-            type="number"
-            value={form.depot_garantie ?? ''}
-            onChange={(e) => set('depot_garantie', Number(e.target.value) || undefined)}
-            className={inputClass}
-            placeholder="2400"
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Type révision</label>
-          <select
-            value={form.type_revision ?? 'IRL'}
-            onChange={(e) => set('type_revision', e.target.value)}
-            className={inputClass}
-          >
-            <option value="IRL">IRL</option>
-            <option value="ILC">ILC</option>
-            <option value="fixe">Fixe</option>
-          </select>
-        </div>
-      </div>
+      <div className="border-b border-[#262626] mb-2" />
+
+      {hasBail && (
+        <>
+          <div>
+            <label className={labelClass}>Bien *</label>
+            <select
+              value={bail?.bien_id ?? ''}
+              onChange={(e) => setBail('bien_id', Number(e.target.value))}
+              className={inputClass}
+              required={hasBail}
+            >
+              <option value="">Sélectionner un bien</option>
+              {biens.map((b) => (
+                <option key={b.id} value={b.id}>{b.adresse} — {b.ville}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={labelClass}>Date début *</label>
+              <input
+                type="date"
+                value={bail?.date_debut ?? ''}
+                onChange={(e) => setBail('date_debut', e.target.value)}
+                className={inputClass}
+                required={hasBail}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Date fin</label>
+              <input
+                type="date"
+                value={bail?.date_fin ?? ''}
+                onChange={(e) => setBail('date_fin', e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Loyer (€) *</label>
+              <input
+                type="number"
+                value={bail?.loyer_mensuel ?? ''}
+                onChange={(e) => setBail('loyer_mensuel', Number(e.target.value))}
+                className={inputClass}
+                required={hasBail}
+                placeholder="1200"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Charges (€)</label>
+              <input
+                type="number"
+                value={bail?.charges_mensuelles ?? ''}
+                onChange={(e) => setBail('charges_mensuelles', Number(e.target.value))}
+                className={inputClass}
+                placeholder="150"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Dépôt garantie (€)</label>
+              <input
+                type="number"
+                value={bail?.depot_garantie ?? ''}
+                onChange={(e) => setBail('depot_garantie', Number(e.target.value) || undefined)}
+                className={inputClass}
+                placeholder="2400"
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Documents */}
       <p className={sectionClass}>Documents</p>
-      <div className="border-2 border-dashed border-[#262626] rounded-md p-6 text-center hover:border-[#404040] transition-colors cursor-pointer">
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".pdf,.jpg,.jpeg,.png"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+      <div
+        onClick={() => fileInputRef.current?.click()}
+        className="border-2 border-dashed border-[#262626] rounded-md p-6 text-center hover:border-[#404040] transition-colors cursor-pointer"
+      >
         <Upload className="h-6 w-6 text-[#404040] mx-auto mb-2" />
-        <p className="text-xs text-[#737373]">Glisser-déposer les documents</p>
+        <p className="text-xs text-[#737373]">Cliquer pour ajouter des documents</p>
         <p className="text-[9px] text-[#525252] mt-0.5">PDF, JPG, PNG — max 10MB</p>
       </div>
+      {pendingFiles.length > 0 && (
+        <div className="space-y-1.5 mt-1">
+          {pendingFiles.map((entry, i) => (
+            <div key={i} className="flex items-center gap-2 p-2 bg-[#1a1a1a] rounded border border-[#262626]">
+              <Paperclip className="h-3 w-3 text-[#525252] shrink-0" />
+              <span className="text-[10px] text-[#737373] truncate flex-1">{entry.file.name}</span>
+              <select
+                value={entry.type}
+                onChange={(e) => updateFileType(i, e.target.value as TypeDocument)}
+                className="h-6 text-[10px] bg-[#0d0d0d] border border-[#262626] rounded px-1 text-[#737373] focus:outline-none"
+              >
+                {(Object.keys(TYPE_DOCUMENT_LABELS) as TypeDocument[]).map((t) => (
+                  <option key={t} value={t}>{TYPE_DOCUMENT_LABELS[t]}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => removeFile(i)}
+                className="text-[#525252] hover:text-white transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-2 pt-3 sticky bottom-0 bg-[#111111]">
         <button

@@ -7,8 +7,7 @@ Endpoints CRUD pour les locataires.
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import List
-from app.schemas.locataire_schema import LocataireCreate, LocataireUpdate, LocataireResponse
+from app.schemas.locataire_schema import LocataireCreate, LocataireUpdate, LocataireResponse, LocatairePaginatedResponse
 from app.services.patrimoine_service import PatrimoineService
 from app.utils.db import get_db
 from app.utils.auth import get_current_user
@@ -16,10 +15,13 @@ from app.utils.auth import get_current_user
 router = APIRouter(prefix="/api/locataires", tags=["Locataires"], dependencies=[Depends(get_current_user)])
 
 
-@router.get("/", response_model=List[LocataireResponse])
+@router.get("/", response_model=LocatairePaginatedResponse)
 def get_all_locataires(limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):  # Paginé
     service = PatrimoineService(db)
-    return service.get_all_locataires(limit=limit, offset=offset)
+    items, total = service.get_all_locataires(limit=limit, offset=offset)
+    page = (offset // limit) + 1
+    pages = max(1, (total + limit - 1) // limit)
+    return LocatairePaginatedResponse(items=items, total=total, page=page, per_page=limit, pages=pages)
 
 
 @router.get("/{locataire_id}", response_model=LocataireResponse)

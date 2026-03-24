@@ -5,13 +5,7 @@ interface SCIOverviewProps {
   data?: SCIOverviewItem[]
 }
 
-const DEFAULT_DATA: SCIOverviewItem[] = [
-  { id: 1, nom: 'SCI Facha', cashflow_mensuel: 2_150, nb_biens: 3, valeur_totale: 910_000 },
-  { id: 2, nom: 'La Renaissance', cashflow_mensuel: 1_320, nb_biens: 2, valeur_totale: 685_000 },
-  { id: 3, nom: 'Patrimoine+', cashflow_mensuel: 745, nb_biens: 2, valeur_totale: 792_500 },
-]
-
-export default function SCIOverview({ data = DEFAULT_DATA }: SCIOverviewProps) {
+export default function SCIOverview({ data = [] }: SCIOverviewProps) {
   return (
     <div className="h-48 p-2 bg-[#111111] border border-[#262626] rounded-md flex flex-col">
       <div className="flex items-center justify-between mb-2">

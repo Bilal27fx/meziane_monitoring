@@ -1,21 +1,8 @@
 import { formatCurrency } from '@/lib/utils/format'
-import { cn } from '@/lib/utils/cn'
+import { useDashboardLocataires } from '@/lib/hooks/useDashboard'
+import type { Locataire } from '@/lib/types'
 
-interface LocataireItem {
-  id: number
-  nom: string
-  bien: string
-  loyer: number
-  statut: 'a_jour' | 'retard' | 'impaye'
-  jours_retard?: number
-}
-
-const MOCK: LocataireItem[] = [
-  { id: 1, nom: 'Karim Benzara', bien: '12 Rue du Commerce', loyer: 1_450, statut: 'a_jour' },
-  { id: 2, nom: 'Sophie Durand', bien: '7 Av. Jean Jaurès', loyer: 1_100, statut: 'retard', jours_retard: 8 },
-]
-
-function StatusDot({ statut, jours_retard }: { statut: LocataireItem['statut']; jours_retard?: number }) {
+function StatusDot({ statut, jours_retard }: { statut: Locataire['statut_paiement']; jours_retard?: number }) {
   if (statut === 'a_jour') {
     return (
       <div className="flex items-center gap-1">
@@ -41,34 +28,41 @@ function StatusDot({ statut, jours_retard }: { statut: LocataireItem['statut']; 
 }
 
 export default function LocatairesCards() {
+  const { data: locataires = [], isLoading } = useDashboardLocataires()
+
   return (
     <div className="h-48 p-2 bg-[#111111] border border-[#262626] rounded-md flex flex-col">
       <div className="flex items-center justify-between mb-2">
         <span className="text-[10px] text-[#737373] uppercase tracking-wide">Locataires</span>
         <span className="text-[9px] bg-[#262626] text-[#a3a3a3] rounded-full px-1.5 py-0.5">
-          {MOCK.length}
+          {isLoading ? '…' : locataires.length}
         </span>
       </div>
       <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
-        {MOCK.map((loc) => (
-          <div
-            key={loc.id}
-            className="bg-[#0d0d0d] border border-[#262626] rounded p-2"
-          >
-            <div className="flex items-start justify-between gap-1">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-white truncate leading-tight">{loc.nom}</p>
-                <p className="text-[9px] text-[#525252] truncate mt-0.5">{loc.bien}</p>
+        {isLoading ? (
+          Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="h-12 bg-[#262626]/30 rounded animate-pulse" />
+          ))
+        ) : locataires.length === 0 ? (
+          <p className="text-[10px] text-[#525252] text-center pt-4">Aucun locataire</p>
+        ) : (
+          locataires.map((loc: Locataire) => (
+            <div key={loc.id} className="bg-[#0d0d0d] border border-[#262626] rounded p-2">
+              <div className="flex items-start justify-between gap-1">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-white truncate leading-tight">{loc.prenom} {loc.nom}</p>
+                  <p className="text-[9px] text-[#525252] truncate mt-0.5">{loc.bail?.bien_adresse ?? '—'}</p>
+                </div>
+                <span className="font-mono text-[10px] text-white flex-shrink-0 tabular-nums">
+                  {loc.bail ? formatCurrency(loc.bail.loyer_mensuel) : '—'}/m
+                </span>
               </div>
-              <span className="font-mono text-[10px] text-white flex-shrink-0 tabular-nums">
-                {formatCurrency(loc.loyer)}/m
-              </span>
+              <div className="mt-1">
+                <StatusDot statut={loc.statut_paiement} jours_retard={loc.jours_retard} />
+              </div>
             </div>
-            <div className="mt-1">
-              <StatusDot statut={loc.statut} jours_retard={loc.jours_retard} />
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   )

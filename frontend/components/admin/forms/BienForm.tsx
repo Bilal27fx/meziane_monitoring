@@ -14,6 +14,16 @@ const inputClass = 'w-full h-8 text-xs bg-[#0d0d0d] border border-[#262626] roun
 const labelClass = 'text-[9px] text-[#525252] uppercase tracking-wide block mb-1'
 const sectionClass = 'text-[10px] text-[#737373] uppercase tracking-widest mb-2 mt-4 first:mt-0 pb-1 border-b border-[#262626]'
 
+const TYPE_BIEN_OPTIONS = [
+  { value: 'appartement', label: 'Appartement' },
+  { value: 'studio', label: 'Studio' },
+  { value: 'maison', label: 'Maison' },
+  { value: 'local_commercial', label: 'Local commercial' },
+  { value: 'immeuble', label: 'Immeuble' },
+  { value: 'parking', label: 'Parking' },
+  { value: 'autre', label: 'Autre' },
+]
+
 export default function BienForm({ bien, onClose }: Props) {
   const createBien = useCreateBien()
   const updateBien = useUpdateBien()
@@ -23,15 +33,15 @@ export default function BienForm({ bien, onClose }: Props) {
   const [form, setForm] = useState<BienFormData>({
     sci_id: bien?.sci_id ?? (scis[0]?.id ?? 0),
     adresse: bien?.adresse ?? '',
-    complement: bien?.complement ?? '',
+    complement_adresse: bien?.complement_adresse ?? '',
     ville: bien?.ville ?? '',
     code_postal: bien?.code_postal ?? '',
-    type: bien?.type ?? 'appartement',
+    type_bien: bien?.type_bien ?? 'appartement',
     surface: bien?.surface ?? undefined,
     nb_pieces: bien?.nb_pieces ?? undefined,
     etage: bien?.etage ?? undefined,
-    dpe: bien?.dpe ?? '',
-    validite_dpe: bien?.validite_dpe ?? '',
+    dpe_classe: bien?.dpe_classe ?? '',
+    dpe_date_validite: bien?.dpe_date_validite ?? '',
     prix_acquisition: bien?.prix_acquisition ?? undefined,
     date_acquisition: bien?.date_acquisition ?? '',
     valeur_actuelle: bien?.valeur_actuelle ?? undefined,
@@ -44,12 +54,19 @@ export default function BienForm({ bien, onClose }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const payload = {
+      ...form,
+      complement_adresse: form.complement_adresse || null,
+      dpe_classe: form.dpe_classe || null,
+      dpe_date_validite: form.dpe_date_validite || null,
+      date_acquisition: form.date_acquisition || null,
+    }
     try {
       if (bien) {
-        await updateBien.mutateAsync({ id: bien.id, data: form })
+        await updateBien.mutateAsync({ id: bien.id, data: payload })
         toast.success('Bien mis à jour')
       } else {
-        await createBien.mutateAsync(form)
+        await createBien.mutateAsync(payload)
         toast.success('Bien créé')
       }
       onClose()
@@ -92,8 +109,8 @@ export default function BienForm({ bien, onClose }: Props) {
         <label className={labelClass}>Complément</label>
         <input
           type="text"
-          value={form.complement ?? ''}
-          onChange={(e) => set('complement', e.target.value)}
+          value={form.complement_adresse ?? ''}
+          onChange={(e) => set('complement_adresse', e.target.value)}
           className={inputClass}
           placeholder="Apt 3, Bât B"
         />
@@ -118,6 +135,7 @@ export default function BienForm({ bien, onClose }: Props) {
             onChange={(e) => set('code_postal', e.target.value)}
             className={inputClass}
             required
+            maxLength={5}
             placeholder="75015"
           />
         </div>
@@ -129,13 +147,13 @@ export default function BienForm({ bien, onClose }: Props) {
         <div>
           <label className={labelClass}>Type *</label>
           <select
-            value={form.type}
-            onChange={(e) => set('type', e.target.value)}
+            value={form.type_bien}
+            onChange={(e) => set('type_bien', e.target.value)}
             className={inputClass}
             required
           >
-            {['appartement', 'maison', 'bureau', 'commerce', 'terrain', 'parking'].map((t) => (
-              <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+            {TYPE_BIEN_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
         </div>
@@ -172,8 +190,8 @@ export default function BienForm({ bien, onClose }: Props) {
         <div>
           <label className={labelClass}>DPE</label>
           <select
-            value={form.dpe ?? ''}
-            onChange={(e) => set('dpe', e.target.value)}
+            value={form.dpe_classe ?? ''}
+            onChange={(e) => set('dpe_classe', e.target.value)}
             className={inputClass}
           >
             <option value="">—</option>
@@ -186,8 +204,8 @@ export default function BienForm({ bien, onClose }: Props) {
           <label className={labelClass}>Validité DPE</label>
           <input
             type="date"
-            value={form.validite_dpe ?? ''}
-            onChange={(e) => set('validite_dpe', e.target.value)}
+            value={form.dpe_date_validite ?? ''}
+            onChange={(e) => set('dpe_date_validite', e.target.value)}
             className={inputClass}
           />
         </div>

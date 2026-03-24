@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **meziane_monitoring** (1096 symbols, 1941 relationships, 42 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **meziane_monitoring** (1464 symbols, 2773 relationships, 45 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -86,6 +86,32 @@ npx gitnexus analyze --embeddings
 To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
 
 > Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
+
+## Re-indexing After Major Modifications
+
+**After any major modification** (adding/removing files, refactoring multiple symbols, changing schemas, modifying API routes, or any change touching 3+ files), MUST re-index via the MCP GitNexus tool then verify the scope of changes:
+
+1. Re-run the analyzer via Bash (required to refresh the graph):
+```bash
+cd "/Users/liticiameziane/Desktop/documents liti/meziane/meziane_monitoring" && npx gitnexus analyze
+```
+
+2. Then immediately use the MCP tool to verify changes are correctly reflected:
+```
+gitnexus_detect_changes({scope: "all"})
+```
+
+3. Use `gitnexus_query` and `gitnexus_context` via MCP (NOT grep/glob) to confirm the new symbols and flows are indexed.
+
+> **Rule**: All post-modification exploration and validation MUST go through the MCP GitNexus tools (`gitnexus_query`, `gitnexus_context`, `gitnexus_impact`, `gitnexus_detect_changes`), never through raw file search.
+
+**What counts as a major modification:**
+- Adding or deleting source files
+- Renaming/moving modules or routes
+- Changing schemas or data models
+- Modifying 3 or more files in a single task
+- Any backend API route changes
+- Any frontend hook or type changes affecting multiple components
 
 ## CLI
 
