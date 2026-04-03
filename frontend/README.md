@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Frontend - Meziane Monitoring
 
-## Getting Started
+Frontend Next.js du projet Meziane Monitoring.
 
-First, run the development server:
+## Rôle
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Cette application expose trois surfaces principales:
+- `dashboard`: vue synthétique patrimoine, cashflow, locataires, opportunités
+- `agent`: centre de contrôle des agents et tâches IA
+- `admin`: back-office de gestion SCI, biens, locataires, transactions et système
+
+## Stack
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- TanStack Query
+- Zustand
+- Axios
+
+## Structure
+
+```text
+frontend/
+├── app/
+│   ├── (auth)/
+│   └── (app)/
+├── components/
+│   ├── admin/
+│   ├── agent/
+│   ├── dashboard/
+│   ├── layout/
+│   └── ui/
+├── lib/
+│   ├── api/
+│   ├── hooks/
+│   ├── stores/
+│   ├── types/
+│   └── utils/
+└── public/
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Lancement
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Application disponible sur `http://localhost:3000`.
 
-## Learn More
+## Configuration
 
-To learn more about Next.js, take a look at the following resources:
+Variable principale:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Le frontend suppose qu'une API FastAPI compatible tourne sur cette URL.
 
-## Deploy on Vercel
+## Conventions utiles
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Le fetching passe principalement par `lib/hooks/`.
+- Le client HTTP central est `lib/api/client.ts`.
+- L'état UI partagé utilise `lib/stores/app-store.ts`.
+- Les composants métier sont regroupés par zone fonctionnelle dans `components/`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Points d'attention
+
+- Lire `AGENTS.md` avant toute modification majeure: la version de Next.js utilisée peut diverger des conventions historiques.
+- L'architecture cible est décrite dans `../docs/architecture/FRONTEND_ARCHITECTURE.md`.
+- Si le comportement réel diverge de la doc d'architecture, documenter l'écart plutôt que le masquer.

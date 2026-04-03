@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Trash2, Plus, ClipboardList, MessageSquare, FolderOpen } from 'lucide-react'
+import { Pencil, Trash2, Plus, ClipboardList, MessageSquare, FolderOpen, Wallet } from 'lucide-react'
 import { useLocataires, useDeleteLocataire } from '@/lib/hooks/useAdmin'
 import DataTable, { Column } from '@/components/ui/DataTable'
 import Modal from '@/components/ui/Modal'
 import LocataireForm from '@/components/admin/forms/LocataireForm'
 import QuittancesPanel from '@/components/admin/panels/QuittancesPanel'
 import DocumentsPanel from '@/components/admin/panels/DocumentsPanel'
+import LocatairePaymentsPanel from '@/components/admin/panels/LocatairePaymentsPanel'
 import Badge from '@/components/ui/Badge'
 import { formatCurrency } from '@/lib/utils/format'
 import toast from 'react-hot-toast'
@@ -25,6 +26,8 @@ export default function LocatairesTab() {
   const [selectedLocataire, setSelectedLocataire] = useState<Locataire | null>(null)
   const [docsOpen, setDocsOpen] = useState(false)
   const [docsLocataire, setDocsLocataire] = useState<Locataire | null>(null)
+  const [paymentsOpen, setPaymentsOpen] = useState(false)
+  const [paymentsLocataire, setPaymentsLocataire] = useState<Locataire | null>(null)
 
   const paiementVariant = (statut?: string) => {
     if (statut === 'a_jour') return 'ok' as const
@@ -55,7 +58,9 @@ export default function LocatairesTab() {
     )},
     { header: 'Loyer', accessor: 'bail', render: (l) => (
       <span className="font-mono text-xs text-white tabular-nums">
-        {l.bail ? formatCurrency(l.bail.loyer_mensuel) + '/m' : '—'}
+        {l.bail
+          ? formatCurrency((l.bail.loyer_mensuel ?? 0) + (l.bail.charges_mensuelles ?? 0)) + '/m'
+          : '—'}
       </span>
     )},
     { header: 'Paiement', accessor: 'statut_paiement', render: (l) => (
@@ -67,6 +72,9 @@ export default function LocatairesTab() {
       <div className="flex items-center gap-1">
         <button onClick={() => { setEditing(l); setModalOpen(true) }} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-white hover:bg-[#262626] transition-colors">
           <Pencil className="h-3 w-3" />
+        </button>
+        <button onClick={() => { setPaymentsLocataire(l); setPaymentsOpen(true) }} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#22c55e] hover:bg-[#22c55e]/10 transition-colors" title="Paiements">
+          <Wallet className="h-3 w-3" />
         </button>
         <button onClick={() => { setSelectedLocataire(l); setQuittancesOpen(true) }} className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#3b82f6] hover:bg-[#3b82f6]/10 transition-colors" title="Quittances">
           <ClipboardList className="h-3 w-3" />
@@ -132,6 +140,12 @@ export default function LocatairesTab() {
         entityType="locataire"
         entityId={docsLocataire?.id ?? null}
         entityNom={docsLocataire ? `${docsLocataire.prenom} ${docsLocataire.nom}` : undefined}
+      />
+
+      <LocatairePaymentsPanel
+        open={paymentsOpen}
+        onClose={() => setPaymentsOpen(false)}
+        locataire={paymentsLocataire}
       />
     </div>
   )

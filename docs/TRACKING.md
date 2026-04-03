@@ -7,6 +7,8 @@
 
 | ID | Titre | Type | Priorité | Statut | Date ouverture | Date clôture |
 |----|-------|------|----------|--------|----------------|--------------|
+| RFC-008 | Sécurité Auth + Performance suite | refactor | CRITIQUE | Terminé | 2026-03-24 | 2026-03-24 |
+| RFC-007 | Scalabilité & Performance Backend | refactor | CRITIQUE | Terminé | 2026-03-24 | 2026-03-24 |
 | RFC-006 | Suppression totale mock data + branchement API | refactor | CRITIQUE | Terminé | 2026-03-24 | 2026-03-24 |
 | RFC-001 | Fix endpoints validate/reject | bugfix | CRITIQUE | Terminé | 2026-03-24 | 2026-03-24 |
 | RFC-002 | Routes backend quittances | feature | HAUTE | Terminé | 2026-03-24 | 2026-03-24 |
@@ -36,8 +38,9 @@
 **Dossier :** `refactors/RFC-001_fix-endpoints-validate-reject/`
 **Type :** bugfix
 **Priorité :** CRITIQUE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Le frontend appelle `/api/transactions/{id}/validate` et `/api/transactions/{id}/reject` (anglais).
@@ -56,8 +59,9 @@ Remplacer `validate` → `valider` et `reject` → `rejeter` dans `useAdmin.ts`.
 **Dossier :** `refactors/RFC-002_quittance-routes-backend/`
 **Type :** feature
 **Priorité :** HAUTE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Le frontend appelle `GET /api/locataires/{id}/quittances` mais aucune route n'existe en backend.
@@ -82,8 +86,9 @@ Enregistrer le router dans `main.py`.
 **Dossier :** `refactors/RFC-003_upload-documents-locataire/`
 **Type :** feature
 **Priorité :** MOYENNE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Dans `LocataireForm.tsx`, la zone drag-and-drop "Glisser-déposer les documents" est purement décorative.
@@ -106,8 +111,9 @@ Le backend a pourtant un endpoint complet : `POST /api/documents/upload-locatair
 **Dossier :** `refactors/RFC-004_quittances-panel-api/`
 **Type :** bugfix
 **Priorité :** MOYENNE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Dans `QuittancesPanel.tsx` :
@@ -129,8 +135,9 @@ Dans `QuittancesPanel.tsx` :
 **Dossier :** `refactors/RFC-005_mock-data-fallback/`
 **Type :** refactor
 **Priorité :** BASSE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Dans `useAdmin.ts`, tous les hooks de lecture ont un catch silencieux qui retourne des données mock sans notifier l'utilisateur :
@@ -156,6 +163,8 @@ Hooks concernés : `useSCIs`, `useBiens`, `useLocataires`, `useTransactions`, `u
 
 | Date | RFC | Résumé des changements |
 |------|-----|------------------------|
+| 2026-03-24 | RFC-008 | Celery crontab, token mémoire+sessionStorage, rate limit login Redis, JWT 30min+role, get_current_user 0 DB, refresh rotation+blacklist, logout endpoint, cashflow 3→1 requête×3, quittances joinedload+batch, detect_duplicates limit(1), gpt-4o-mini, max_retries tasks |
+| 2026-03-24 | RFC-007 | Index DB (14 index), pool_size=20, dashboard KPI -2 requêtes, cashflow 30j GROUP BY SQL, top biens ORDER BY SQL, timeouts httpx, asyncio.run(), health check réel |
 | 2026-03-24 | RFC-001 | `useAdmin.ts` — `/validate` → `/valider`, `/reject` → `/rejeter` |
 | 2026-03-24 | RFC-002 | `quittance_routes.py` + `quittance_schema.py` créés, router enregistré dans `main.py` |
 | 2026-03-24 | RFC-003 | `LocataireForm.tsx` — input file + handler + upload `FormData` vers `/api/documents/upload-locataire` |

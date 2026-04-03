@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **meziane_monitoring** (1464 symbols, 2773 relationships, 45 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **workspace** (2660 symbols, 4868 relationships, 82 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -17,7 +17,7 @@ This project is indexed by GitNexus as **meziane_monitoring** (1464 symbols, 277
 
 1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
 2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ gitnexus://repo/meziane_monitoring/process/{processName}` — trace the full execution flow step by step
+3. `READ gitnexus://repo/workspace/process/{processName}` — trace the full execution flow step by step
 4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
 
 ## When Refactoring
@@ -56,10 +56,10 @@ This project is indexed by GitNexus as **meziane_monitoring** (1464 symbols, 277
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/meziane_monitoring/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/meziane_monitoring/clusters` | All functional areas |
-| `gitnexus://repo/meziane_monitoring/processes` | All execution flows |
-| `gitnexus://repo/meziane_monitoring/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/workspace/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/workspace/clusters` | All functional areas |
+| `gitnexus://repo/workspace/processes` | All execution flows |
+| `gitnexus://repo/workspace/process/{name}` | Step-by-step execution trace |
 
 ## Self-Check Before Finishing
 

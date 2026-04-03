@@ -53,6 +53,7 @@ class Document(Base):  # Représente document numérisé stocké S3
     sci_id = Column(Integer, ForeignKey("sci.id"), nullable=False, index=True)
     bien_id = Column(Integer, ForeignKey("biens.id"), nullable=True, index=True)
     locataire_id = Column(Integer, ForeignKey("locataires.id"), nullable=True, index=True)
+    folder_id = Column(Integer, ForeignKey("document_folders.id"), nullable=True, index=True)
 
     # Type & Stockage
     type_document = Column(Enum(TypeDocument), nullable=False)
@@ -70,6 +71,7 @@ class Document(Base):  # Représente document numérisé stocké S3
     sci = relationship("SCI", back_populates="documents")
     bien = relationship("Bien", back_populates="documents")
     locataire = relationship("Locataire", back_populates="documents")
+    folder = relationship("DocumentFolder", back_populates="documents")
     extractions = relationship("DocumentExtraction", back_populates="document", cascade="all, delete-orphan")
 
     def __repr__(self):

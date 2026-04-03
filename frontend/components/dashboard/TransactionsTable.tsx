@@ -1,68 +1,68 @@
 import Link from 'next/link'
 import { formatDate, formatCurrency } from '@/lib/utils/format'
 import Badge from '@/components/ui/Badge'
-import type { Transaction } from '@/lib/types'
+import type { DashboardTransaction } from '@/lib/types'
 
 interface TransactionsTableProps {
-  data?: Transaction[]
+  data?: DashboardTransaction[]
 }
 
 
 function statutBadge(statut: string) {
-  if (statut === 'valide') return <Badge variant="ok" dot>Validé</Badge>
-  if (statut === 'en_attente') return <Badge variant="warning" dot>En attente</Badge>
+  if (statut === 'valide' || statut === 'validated') return <Badge variant="ok" dot>Validé</Badge>
+  if (statut === 'en_attente' || statut === 'pending') return <Badge variant="warning" dot>En attente</Badge>
   return <Badge variant="error" dot>Rejeté</Badge>
 }
 
 export default function TransactionsTable({ data = [] }: TransactionsTableProps) {
-  const rows = data.slice(0, 7)
+  const rows = data.slice(0, 8)
 
   return (
-    <div className="h-48 p-2 bg-[#111111] border border-[#262626] rounded-md flex flex-col">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] text-[#737373] uppercase tracking-wide">Transactions récentes</span>
-        <Link href="/admin" className="text-[9px] text-[#525252] hover:text-white transition-colors">
+    <div className="p-3.5 bg-[#111111] border border-[#262626] rounded-lg flex flex-col hover:border-[#404040] transition-colors">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs text-[#a3a3a3] uppercase tracking-widest font-medium">Transactions récentes</span>
+        <Link href="/admin?tab=transactions" className="text-xs text-[#737373] hover:text-white transition-colors font-medium">
           Voir toutes →
         </Link>
       </div>
-      <div className="flex-1 overflow-hidden">
+      <div className="overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#262626]">
-              <th className="text-left text-[9px] text-[#525252] uppercase tracking-wider py-1 px-1">Date</th>
-              <th className="text-left text-[9px] text-[#525252] uppercase tracking-wider py-1 px-1">SCI</th>
-              <th className="text-left text-[9px] text-[#525252] uppercase tracking-wider py-1 px-1">Libellé</th>
-              <th className="text-left text-[9px] text-[#525252] uppercase tracking-wider py-1 px-1">Catégorie</th>
-              <th className="text-right text-[9px] text-[#525252] uppercase tracking-wider py-1 px-1">Montant</th>
-              <th className="text-right text-[9px] text-[#525252] uppercase tracking-wider py-1 px-1">Statut</th>
+              <th className="text-left text-xs text-[#737373] uppercase tracking-wider py-2 px-2">Date</th>
+              <th className="text-left text-xs text-[#737373] uppercase tracking-wider py-2 px-2">SCI</th>
+              <th className="text-left text-xs text-[#737373] uppercase tracking-wider py-2 px-2">Libellé</th>
+              <th className="text-left text-xs text-[#737373] uppercase tracking-wider py-2 px-2">Catégorie</th>
+              <th className="text-right text-xs text-[#737373] uppercase tracking-wider py-2 px-2">Montant</th>
+              <th className="text-right text-xs text-[#737373] uppercase tracking-wider py-2 px-2">Statut</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((tx) => (
-              <tr key={tx.id} className="border-b border-[#262626]/40 hover:bg-[#1a1a1a] transition-colors">
-                <td className="py-1 px-1">
-                  <span className="font-mono text-[10px] text-[#a3a3a3]">{formatDate(tx.date)}</span>
+              <tr key={tx.id} className="border-b border-[#1f1f1f] hover:bg-[#1a1a1a] transition-colors">
+                <td className="py-2 px-2">
+                  <span className="font-mono text-xs text-[#d4d4d4]">{formatDate(tx.date)}</span>
                 </td>
-                <td className="py-1 px-1">
-                  <span className="text-[10px] text-[#737373] truncate">{tx.sci?.nom ?? `SCI #${tx.sci_id}`}</span>
+                <td className="py-2 px-2">
+                  <span className="text-xs text-[#a3a3a3] truncate">{tx.sci_nom ?? '—'}</span>
                 </td>
-                <td className="py-1 px-1 max-w-0">
-                  <span className="text-[10px] text-white block truncate">{tx.libelle}</span>
+                <td className="py-2 px-2 max-w-0">
+                  <span className="text-xs text-white block truncate font-medium">{tx.libelle}</span>
                 </td>
-                <td className="py-1 px-1">
-                  <span className="bg-[#262626] text-[#a3a3a3] text-[9px] rounded px-1 py-0.5">{tx.categorie}</span>
+                <td className="py-2 px-2">
+                  <span className="bg-[#262626] text-[#d4d4d4] text-xs rounded-md px-2 py-0.5">{tx.categorie}</span>
                 </td>
-                <td className="py-1 px-1 text-right">
+                <td className="py-2 px-2 text-right">
                   <span
-                    className={`font-mono font-semibold text-xs tabular-nums ${
+                    className={`font-mono font-semibold text-sm tabular-nums ${
                       tx.montant >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]'
                     }`}
                   >
                     {tx.montant >= 0 ? '+' : ''}{formatCurrency(tx.montant)}
                   </span>
                 </td>
-                <td className="py-1 px-1 text-right">
-                  {statutBadge(tx.statut)}
+                <td className="py-2 px-2 text-right">
+                  {statutBadge(tx.statut_validation)}
                 </td>
               </tr>
             ))}

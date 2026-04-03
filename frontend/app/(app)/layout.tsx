@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
+import { tokenStore } from '@/lib/api/client'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && !localStorage.getItem('access_token')) {
+    if (!tokenStore.getAccessToken() && !tokenStore.getRefreshToken()) {
       router.push('/login')
     }
   }, [router])
@@ -30,7 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="h-screen bg-[#0a0a0a] overflow-hidden">
         <Sidebar />
         <Header />
-        <main className="pl-12 pt-14 h-full overflow-hidden">
+        <main className="pl-12 pt-14 h-full overflow-y-auto">
           {children}
         </main>
       </div>

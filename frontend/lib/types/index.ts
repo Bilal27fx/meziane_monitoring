@@ -35,6 +35,8 @@ export interface Bien {
   statut: 'loue' | 'vacant' | 'travaux' | 'vente'
   loyer_mensuel?: number
   tri_net?: number
+  statut_paiement?: 'a_jour' | 'retard' | 'impaye'
+  jours_retard?: number
 }
 
 export interface BailInfo {
@@ -90,6 +92,58 @@ export interface Quittance {
   created_at: string
 }
 
+export interface LocatairePaiement {
+  id: number
+  locataire_id: number
+  bail_id: number
+  quittance_id?: number
+  date_paiement: string
+  montant: number
+  mode_paiement: 'virement' | 'prelevement' | 'carte' | 'cheque' | 'especes' | 'autre'
+  reference?: string
+  note?: string
+  created_at: string
+}
+
+export interface LocatairePaiementMonthStatus {
+  key: string
+  label: string
+  quittance_id?: number
+  statut: 'payee' | 'partielle' | 'impayee' | 'en_attente' | 'a_generer'
+  montant_du: number
+  montant_paye: number
+  solde: number
+  date_paiement?: string
+}
+
+export interface LocatairePaiementYearSummary {
+  annee: number
+  total_du: number
+  total_paye: number
+  reste_a_payer: number
+  mensualites_total: number
+  mensualites_reglees: number
+  mensualites_en_retard: number
+}
+
+export interface LocatairePaiementOverview {
+  locataire_id: number
+  bail_id?: number
+  date_debut_bail?: string
+  date_fin_bail?: string
+  montant_mensuel: number
+  total_du: number
+  total_paye: number
+  reste_a_payer: number
+  mensualites_total: number
+  mensualites_reglees: number
+  mensualites_en_retard: number
+  paiements: LocatairePaiement[]
+  derniers_mois: LocatairePaiementMonthStatus[]
+  historique_mensuel: LocatairePaiementMonthStatus[]
+  resume_annuel: LocatairePaiementYearSummary[]
+}
+
 export type TypeDocument =
   | 'facture'
   | 'releve_bancaire'
@@ -110,53 +164,33 @@ export type TypeDocument =
   | 'quittance_loyer_precedente'
   | 'autre'
 
-export const TYPE_DOCUMENT_LABELS: Record<TypeDocument, string> = {
-  facture: 'Facture',
-  releve_bancaire: 'Relevé bancaire',
-  taxe_fonciere: 'Taxe foncière',
-  bail: 'Bail',
-  diagnostic_dpe: 'Diagnostic DPE',
-  diagnostic_amiante: 'Diagnostic amiante',
-  statuts_sci: 'Statuts SCI',
-  kbis: 'KBIS',
-  piece_identite: "Pièce d'identité",
-  justificatif_domicile: 'Justificatif de domicile',
-  contrat_travail: 'Contrat de travail',
-  fiche_paie: 'Fiche de paie',
-  avis_imposition: "Avis d'imposition",
-  rib: 'RIB',
-  assurance_habitation: 'Assurance habitation',
-  acte_caution_solidaire: 'Acte de caution solidaire',
-  quittance_loyer_precedente: 'Quittance loyer précédente',
-  autre: 'Autre',
-}
-
-export const TYPE_DOCUMENT_SCI: TypeDocument[] = [
-  'statuts_sci', 'kbis', 'bail', 'facture', 'releve_bancaire',
-  'taxe_fonciere', 'diagnostic_dpe', 'diagnostic_amiante', 'autre',
-]
-
-export const TYPE_DOCUMENT_BIEN: TypeDocument[] = [
-  'bail', 'diagnostic_dpe', 'diagnostic_amiante', 'taxe_fonciere',
-  'facture', 'releve_bancaire', 'autre',
-]
-
-export const TYPE_DOCUMENT_LOCATAIRE: TypeDocument[] = [
-  'piece_identite', 'justificatif_domicile', 'contrat_travail', 'fiche_paie',
-  'avis_imposition', 'rib', 'assurance_habitation', 'acte_caution_solidaire',
-  'quittance_loyer_precedente', 'bail', 'autre',
-]
-
 export interface Document {
   id: number
   sci_id: number
   bien_id?: number
   locataire_id?: number
+  folder_id?: number
   type_document: TypeDocument
   nom_fichier: string
   s3_url?: string
   date_document?: string
   uploaded_at: string
+}
+
+export interface DocumentFolder {
+  id: number
+  sci_id: number
+  bien_id?: number
+  locataire_id?: number
+  parent_id?: number
+  nom: string
+  created_at: string
+}
+
+export interface DocumentLibrary {
+  current_folder?: DocumentFolder | null
+  folders: DocumentFolder[]
+  documents: Document[]
 }
 
 export interface Opportunite {
@@ -193,41 +227,91 @@ export interface User {
 
 export interface DashboardKPIs {
   patrimoine_net: number
-  patrimoine_net_change: number
-  cashflow_mensuel: number
-  cashflow_mensuel_change: number
+  cashflow_today: number
+  nb_alertes: number
+  performance_ytd: number
   taux_occupation: number
-  taux_occupation_change: number
-  nb_biens: number
-  nb_biens_change: number
+  nb_locataires_actifs: number
+}
+
+export interface DashboardTransaction {
+  id: number
+  date: string
+  montant: number
+  libelle: string
+  categorie?: string
+  sci_nom?: string
+  bien_adresse?: string
+  statut_validation: string
 }
 
 export interface DashboardFull {
-  kpis: DashboardKPIs
-  cashflow_history: { date: string; value: number }[]
-  patrimoine_history: { date: string; value: number }[]
+  kpi: DashboardKPIs
+  cashflow_30days: { date: string; revenus: number; depenses: number; net: number }[]
+  patrimoine_12months: { date: string; valeur: number }[]
   top_biens: TopBien[]
-  recent_transactions: Transaction[]
+  recent_transactions: DashboardTransaction[]
   sci_overview: SCIOverviewItem[]
-  opportunites_count: number
-  locataires_actifs: number
+  locataires: LocataireOverview[]
+  opportunites: OpportuniteOverview[]
 }
 
 export interface TopBien {
   id: number
   adresse: string
-  sci_nom: string
-  valeur: number
-  tri_net: number
-  rank: number
+  ville: string
+  type_bien: string
+  valeur_actuelle: number
+  rentabilite_brute: number
+  rentabilite_nette: number
+  cashflow_annuel: number
 }
 
 export interface SCIOverviewItem {
   id: number
   nom: string
-  cashflow_mensuel: number
+  siret?: string
   nb_biens: number
-  valeur_totale: number
+  valeur_patrimoniale: number
+  cashflow_annuel: number
+  revenus_annuels: number
+  depenses_annuelles: number
+}
+
+export interface LocataireOverview {
+  id: number
+  nom: string
+  prenom: string
+  email?: string
+  telephone?: string
+  bien_adresse?: string
+  loyer_mensuel: number
+  statut_paiement: string
+  nb_impayes: number
+  date_debut_bail: string
+}
+
+export interface OpportuniteOverview {
+  id: number
+  titre?: string
+  ville: string
+  prix: number
+  surface?: number
+  prix_m2?: number
+  nb_pieces?: number
+  score_global?: number
+  rentabilite_brute?: number
+  rentabilite_nette?: number
+  source: string
+  url_annonce: string
+  date_detection: string
+  statut: string
+}
+
+export interface ServicesHealth {
+  api: 'online' | 'offline'
+  database: 'online' | 'offline'
+  celery: 'online' | 'offline'
 }
 
 // ─── Agent / Task ────────────────────────────────────────────────────────────
@@ -249,6 +333,58 @@ export interface AgentConfig {
   budget_max: number
   tri_minimum: number
   sources: string[]
+}
+
+export interface AuctionAgentRun {
+  id: number
+  agent_definition_id: number
+  parameter_set_id?: number | null
+  trigger_type: 'manual' | 'scheduled' | 'backfill'
+  status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
+  parameter_snapshot: Record<string, unknown>
+  prompt_snapshot?: Record<string, unknown> | null
+  code_version?: string | null
+  started_at: string
+  finished_at?: string | null
+  created_at: string
+}
+
+export interface AuctionAgentRunEvent {
+  id: number
+  run_id: number
+  level: 'debug' | 'info' | 'warning' | 'error'
+  step?: string | null
+  event_type: string
+  message: string
+  payload?: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface AuctionListing {
+  id: number
+  source_id: number
+  session_id: number
+  external_id?: string | null
+  source_url: string
+  reference_annonce?: string | null
+  title: string
+  listing_type?: string | null
+  reserve_price?: number | null
+  city?: string | null
+  postal_code?: string | null
+  address?: string | null
+  surface_m2?: number | null
+  occupancy_status?: string | null
+  status: 'discovered' | 'normalized' | 'enriched' | 'shortlisted' | 'rejected'
+  published_at?: string | null
+  last_seen_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AuctionQuickLaunchPayload {
+  audience_urls: string[]
+  auto_dispatch?: boolean
 }
 
 // ─── API Response Shapes ─────────────────────────────────────────────────────

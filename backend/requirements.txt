@@ -55,6 +55,7 @@ aiosmtplib==3.0.1
 # Utils
 python-dotenv==1.0.0
 pydantic-extra-types==2.1.0
+fpdf==1.7.2
 
 # Testing
 pytest==7.4.3

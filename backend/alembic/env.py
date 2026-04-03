@@ -27,10 +27,17 @@ from app.models.locataire import Locataire
 from app.models.bail import Bail
 from app.models.quittance import Quittance
 from app.models.document import Document
+from app.models.document_folder import DocumentFolder
 from app.models.document_extraction import DocumentExtraction
 from app.models.opportunite import Opportunite
 from app.models.simulation import Simulation
 from app.models.user import User
+from app.models.auction_source import AuctionSource
+from app.models.auction_session import AuctionSession
+from app.models.auction_listing import AuctionListing
+from app.models.agent_definition import AgentDefinition
+from app.models.agent_parameter_set import AgentParameterSet
+from app.models.agent_run import AgentRun
 
 config = context.config
 

@@ -35,6 +35,7 @@ class SCI(Base):  # Représente une SCI avec infos juridiques et relations
     biens = relationship("Bien", back_populates="sci", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="sci", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="sci", cascade="all, delete-orphan")
+    document_folders = relationship("DocumentFolder", back_populates="sci", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<SCI {self.nom}>"

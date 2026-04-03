@@ -51,6 +51,7 @@ class Bail(Base):  # Représente contrat de location bien-locataire
     bien = relationship("Bien", back_populates="baux")
     locataire = relationship("Locataire", back_populates="baux")
     quittances = relationship("Quittance", back_populates="bail", cascade="all, delete-orphan")
+    paiements = relationship("LocatairePaiement", back_populates="bail", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Bail {self.locataire.nom} - {self.bien.ville} - {self.loyer_mensuel}€>"

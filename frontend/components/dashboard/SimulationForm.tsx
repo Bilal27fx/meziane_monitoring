@@ -28,14 +28,14 @@ export default function SimulationForm() {
   }, [prix, apport, taux])
 
   const inputClass =
-    'h-7 text-xs font-mono bg-[#0d0d0d] border border-[#262626] rounded px-2 text-white w-full focus:outline-none focus:border-[#404040] tabular-nums'
-  const labelClass = 'text-[9px] text-[#525252] uppercase tracking-wide mb-0.5 block'
+    'h-8 text-sm font-mono bg-[#0d0d0d] border border-[#262626] rounded-md px-2.5 text-white w-full focus:outline-none focus:border-[#404040] tabular-nums placeholder:text-[#525252]'
+  const labelClass = 'text-xs text-[#a3a3a3] uppercase tracking-wider mb-1 block font-medium'
 
   return (
-    <div className="h-48 p-2 bg-[#111111] border border-[#262626] rounded-md flex flex-col">
-      <span className="text-[10px] text-[#737373] uppercase tracking-wide mb-2">Simulateur</span>
+    <div className="p-3.5 bg-[#111111] border border-[#262626] rounded-lg flex flex-col hover:border-[#404040] transition-colors">
+      <span className="text-xs text-[#a3a3a3] uppercase tracking-widest font-medium mb-3">Simulateur</span>
 
-      <div className="grid grid-cols-3 gap-1.5 mb-2">
+      <div className="grid grid-cols-3 gap-2 mb-3">
         <div>
           <label className={labelClass}>Prix €</label>
           <input
@@ -70,33 +70,33 @@ export default function SimulationForm() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-1 flex-1">
-        <div className="bg-[#0d0d0d] border border-[#262626] rounded p-1.5">
-          <span className="text-[9px] text-[#525252] uppercase block">Mensualité</span>
-          <span className="text-xs font-mono text-white tabular-nums">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-[#0d0d0d] border border-[#262626] rounded-md p-2.5">
+          <span className="text-xs text-[#737373] uppercase tracking-wider block mb-1">Mensualité</span>
+          <span className="text-sm font-mono text-white tabular-nums font-semibold">
             {formatCurrency(results.mensualite)}/m
           </span>
         </div>
-        <div className="bg-[#0d0d0d] border border-[#262626] rounded p-1.5">
-          <span className="text-[9px] text-[#525252] uppercase block">Cashflow net</span>
+        <div className="bg-[#0d0d0d] border border-[#262626] rounded-md p-2.5">
+          <span className="text-xs text-[#737373] uppercase tracking-wider block mb-1">Cashflow net</span>
           <span
             className={cn(
-              'text-xs font-mono tabular-nums',
+              'text-sm font-mono tabular-nums font-semibold',
               results.cashflow >= 0 ? 'text-[#22c55e]' : 'text-[#ef4444]'
             )}
           >
             {results.cashflow >= 0 ? '+' : ''}{formatCurrency(results.cashflow)}/m
           </span>
         </div>
-        <div className="bg-[#0d0d0d] border border-[#262626] rounded p-1.5">
-          <span className="text-[9px] text-[#525252] uppercase block">TRI Brut</span>
-          <span className={cn('text-xs font-mono tabular-nums', triTextColor(results.triBrut))}>
+        <div className="bg-[#0d0d0d] border border-[#262626] rounded-md p-2.5">
+          <span className="text-xs text-[#737373] uppercase tracking-wider block mb-1">TRI Brut</span>
+          <span className={cn('text-sm font-mono tabular-nums font-semibold', triTextColor(results.triBrut))}>
             {formatPercentRaw(results.triBrut)}
           </span>
         </div>
-        <div className="bg-[#0d0d0d] border border-[#262626] rounded p-1.5">
-          <span className="text-[9px] text-[#525252] uppercase block">TRI Net</span>
-          <span className={cn('text-xs font-mono tabular-nums', triTextColor(results.triNet))}>
+        <div className="bg-[#0d0d0d] border border-[#262626] rounded-md p-2.5">
+          <span className="text-xs text-[#737373] uppercase tracking-wider block mb-1">TRI Net</span>
+          <span className={cn('text-sm font-mono tabular-nums font-semibold', triTextColor(results.triNet))}>
             {formatPercentRaw(results.triNet)}
           </span>
         </div>

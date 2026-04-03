@@ -13,22 +13,22 @@ export default function KPICard({ title, value, change, trend, icon: Icon, subti
   const showChange = change !== undefined && change !== 0
 
   return (
-    <div className="h-14 p-2.5 bg-[#111111] border border-[#262626] rounded-md flex items-center gap-3">
+    <div className="h-20 p-3.5 bg-[#111111] border border-[#262626] rounded-lg flex items-center gap-3.5 hover:border-[#404040] transition-colors">
       {Icon && (
-        <div className="flex-shrink-0">
-          <Icon className="h-3.5 w-3.5 text-[#525252]" />
+        <div className="flex-shrink-0 w-8 h-8 rounded-md bg-[#1a1a1a] flex items-center justify-center">
+          <Icon className="h-4 w-4 text-[#a3a3a3]" />
         </div>
       )}
       <div className="flex flex-col min-w-0 flex-1">
-        <span className="text-[10px] text-[#737373] uppercase tracking-wide truncate">{title}</span>
-        <div className="flex items-baseline gap-1.5 mt-0.5">
-          <span className="text-base font-semibold font-mono text-white tabular-nums leading-none">
+        <span className="text-xs text-[#a3a3a3] uppercase tracking-widest truncate font-medium">{title}</span>
+        <div className="flex items-baseline gap-2 mt-1">
+          <span className="text-xl font-semibold font-mono text-white tabular-nums leading-none">
             {value}
           </span>
           {showChange && (
             <span
               className={cn(
-                'text-[10px] font-mono flex-shrink-0',
+                'text-xs font-mono flex-shrink-0',
                 trend === 'up' ? 'text-[#22c55e]' : trend === 'down' ? 'text-[#ef4444]' : 'text-[#737373]'
               )}
             >
@@ -38,7 +38,7 @@ export default function KPICard({ title, value, change, trend, icon: Icon, subti
           )}
         </div>
         {subtitle && (
-          <span className="text-[9px] text-[#525252] truncate">{subtitle}</span>
+          <span className="text-[11px] text-[#737373] truncate mt-0.5">{subtitle}</span>
         )}
       </div>
     </div>

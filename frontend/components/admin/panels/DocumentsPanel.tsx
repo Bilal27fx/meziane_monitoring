@@ -1,17 +1,18 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { X, Upload, Trash2, FileText, Paperclip, Download, Eye } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, Trash2, FileText, Paperclip, Download, Eye, Folder, ChevronLeft } from 'lucide-react'
 import {
-  useDocumentsSCI, useDocumentsBien, useDocumentsLocataire,
-  useUploadDocument, useUploadDocumentLocataire, useDeleteDocument,
+  useDocumentLibrary,
+  useUploadDocument,
+  useDeleteDocument,
+  useCreateDocumentFolder,
+  useDeleteDocumentFolder,
 } from '@/lib/hooks/useAdmin'
-import {
-  TYPE_DOCUMENT_LABELS, TYPE_DOCUMENT_SCI, TYPE_DOCUMENT_BIEN, TYPE_DOCUMENT_LOCATAIRE,
-} from '@/lib/types'
-import type { TypeDocument, Document } from '@/lib/types'
+import type { Document, DocumentFolder } from '@/lib/types'
 import api from '@/lib/api/client'
 import toast from 'react-hot-toast'
+import DocumentActionComposer from '@/components/admin/documents/DocumentActionComposer'
 
 export type DocumentEntityType = 'sci' | 'bien' | 'locataire'
 
@@ -23,12 +24,6 @@ interface Props {
   entityNom?: string
   /** Requis pour bien : sci_id du bien */
   sciId?: number
-}
-
-const TYPES_BY_ENTITY: Record<DocumentEntityType, TypeDocument[]> = {
-  sci: TYPE_DOCUMENT_SCI,
-  bien: TYPE_DOCUMENT_BIEN,
-  locataire: TYPE_DOCUMENT_LOCATAIRE,
 }
 
 function formatDate(d: string) {
@@ -43,53 +38,36 @@ function isImage(nom: string) {
   return /\.(jpg|jpeg|png)$/i.test(nom)
 }
 
-function useDocuments(entityType: DocumentEntityType, entityId: number | null) {
-  const sci = useDocumentsSCI(entityType === 'sci' ? entityId : null)
-  const bien = useDocumentsBien(entityType === 'bien' ? entityId : null)
-  const loc = useDocumentsLocataire(entityType === 'locataire' ? entityId : null)
-  if (entityType === 'sci') return sci
-  if (entityType === 'bien') return bien
-  return loc
-}
-
 export default function DocumentsPanel({ open, onClose, entityType, entityId, entityNom, sciId }: Props) {
-  const { data: documents = [], isLoading } = useDocuments(entityType, entityId)
+  const [currentFolder, setCurrentFolder] = useState<DocumentFolder | null>(null)
+  const [folderTrail, setFolderTrail] = useState<DocumentFolder[]>([])
   const uploadDoc = useUploadDocument()
-  const uploadLocataire = useUploadDocumentLocataire()
   const deleteDoc = useDeleteDocument()
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const availableTypes = TYPES_BY_ENTITY[entityType]
-  const [selectedType, setSelectedType] = useState<TypeDocument>(availableTypes[0])
+  const createFolder = useCreateDocumentFolder()
+  const deleteFolder = useDeleteDocumentFolder()
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
 
+  const library = useDocumentLibrary({
+    sciId: entityType === 'sci' ? entityId : sciId,
+    bienId: entityType === 'bien' ? entityId : undefined,
+    locataireId: entityType === 'locataire' ? entityId : undefined,
+    folderId: currentFolder?.id,
+  })
+  const folders = library.data?.folders ?? []
+  const documents = library.data?.documents ?? []
+  const isLoading = library.isLoading
+
+  useEffect(() => {
+    if (!open) return
+    setCurrentFolder(null)
+    setFolderTrail([])
+  }, [open, entityId, entityType])
+
   if (!open) return null
 
-  const isPending = uploadDoc.isPending || uploadLocataire.isPending
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !entityId) return
-    try {
-      if (entityType === 'locataire') {
-        await uploadLocataire.mutateAsync({ locataireId: entityId, file, typeDocument: selectedType })
-      } else {
-        const resolvedSciId = entityType === 'sci' ? entityId : (sciId ?? entityId)
-        await uploadDoc.mutateAsync({
-          sciId: resolvedSciId,
-          bienId: entityType === 'bien' ? entityId : undefined,
-          file,
-          typeDocument: selectedType,
-        })
-      }
-      toast.success(`${file.name} uploadé`)
-    } catch {
-      toast.error("Erreur lors de l'upload")
-    }
-    e.target.value = ''
-  }
+  const isPending = uploadDoc.isPending || createFolder.isPending
 
   const handleDelete = async (id: number, nom: string) => {
     try {
@@ -101,15 +79,100 @@ export default function DocumentsPanel({ open, onClose, entityType, entityId, en
     }
   }
 
+  const handleCreateFolderFromComposer = async (folderName: string) => {
+    if (!entityId) return
+    try {
+      const response = await createFolder.mutateAsync({
+        sciId: entityType === 'sci' ? entityId : sciId,
+        bienId: entityType === 'bien' ? entityId : undefined,
+        locataireId: entityType === 'locataire' ? entityId : undefined,
+        parentId: currentFolder?.id,
+        nom: folderName,
+      })
+      const createdFolder = response.data
+      toast.success(`Dossier "${createdFolder.nom}" créé`)
+    } catch {
+      toast.error('Erreur lors de la création du dossier')
+      throw new Error('document-folder-create-failed')
+    }
+  }
+
+  const handleUploadFromComposer = async ({
+    folderRef,
+    documentName,
+    files,
+  }: {
+    folderRef: string
+    documentName: string
+    files: File[]
+  }) => {
+    if (!entityId) return
+    const parsedFolderId = folderRef ? Number(folderRef) : undefined
+    try {
+      for (const [index, file] of files.entries()) {
+        await uploadDoc.mutateAsync({
+          sciId: entityType === 'sci' ? entityId : sciId,
+          bienId: entityType === 'bien' ? entityId : undefined,
+          locataireId: entityType === 'locataire' ? entityId : undefined,
+          folderId: parsedFolderId,
+          file,
+          nomDocument: index === 0 ? documentName || undefined : undefined,
+        })
+      }
+      toast.success(
+        files.length === 1
+          ? `${documentName || files[0].name} uploadé`
+          : `${files.length} documents uploadés`
+      )
+    } catch {
+      toast.error("Erreur lors de l'upload")
+      throw new Error('document-upload-failed')
+    }
+  }
+
+  const handleDeleteFolder = async (folder: DocumentFolder) => {
+    try {
+      await deleteFolder.mutateAsync(folder.id)
+      toast.success(`Dossier "${folder.nom}" supprimé`)
+      if (currentFolder?.id === folder.id) {
+        setCurrentFolder(null)
+        setFolderTrail([])
+      }
+    } catch {
+      toast.error('Le dossier doit être vide avant suppression')
+    }
+  }
+
+  const openFolder = (folder: DocumentFolder) => {
+    setCurrentFolder(folder)
+    setFolderTrail((prev) => [...prev, folder])
+  }
+
+  const goBackFolder = () => {
+    setFolderTrail((prev) => {
+      const next = prev.slice(0, -1)
+      setCurrentFolder(next[next.length - 1] ?? null)
+      return next
+    })
+  }
+
   const handleDownload = async (doc: Document) => {
     try {
       const response = await api.get(`/api/documents/${doc.id}/download`, { responseType: 'blob' })
-      const url = URL.createObjectURL(response.data as Blob)
+      const blob = response.data instanceof Blob
+        ? response.data
+        : new Blob([response.data], { type: response.headers['content-type'] ?? 'application/octet-stream' })
+      const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = doc.nom_fichier
+      a.download = doc.nom_fichier || `document-${doc.id}`
+      a.style.display = 'none'
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(url)
+      window.setTimeout(() => {
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }, 1000)
     } catch {
       toast.error('Erreur lors du téléchargement')
     }
@@ -140,6 +203,14 @@ export default function DocumentsPanel({ open, onClose, entityType, entityId, en
     bien: 'Documents du bien',
     locataire: 'Documents locataire',
   }
+
+  const destinationFolders = [
+    { value: '', label: 'Racine' },
+    ...(currentFolder ? [{ value: String(currentFolder.id), label: `${currentFolder.nom} (courant)` }] : []),
+    ...folders
+      .filter((folder) => folder.id !== currentFolder?.id)
+      .map((folder) => ({ value: String(folder.id), label: folder.nom })),
+  ]
 
   return (
     <>
@@ -188,24 +259,26 @@ export default function DocumentsPanel({ open, onClose, entityType, entityId, en
 
         {/* Upload */}
         <div className="px-4 py-3 border-b border-[#262626] space-y-2">
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as TypeDocument)}
-            className="w-full h-8 text-xs bg-[#0d0d0d] border border-[#262626] rounded px-2.5 text-white focus:outline-none"
-          >
-            {availableTypes.map((t) => (
-              <option key={t} value={t}>{TYPE_DOCUMENT_LABELS[t]}</option>
-            ))}
-          </select>
-          <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileSelect} />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isPending}
-            className="w-full h-8 flex items-center justify-center gap-1.5 border border-dashed border-[#262626] rounded text-xs text-[#737373] hover:border-[#404040] hover:text-white transition-colors disabled:opacity-50"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            {isPending ? 'Upload…' : 'Ajouter un document'}
-          </button>
+          {currentFolder && (
+            <div className="flex items-center gap-2 text-[10px] text-[#737373]">
+              <button
+                onClick={goBackFolder}
+                className="flex items-center gap-1 text-[#737373] hover:text-white transition-colors"
+              >
+                <ChevronLeft className="h-3 w-3" />
+                Retour
+              </button>
+              <span className="text-[#525252]">/</span>
+              <span className="truncate text-white">{currentFolder.nom}</span>
+            </div>
+          )}
+          <DocumentActionComposer
+            folderOptions={destinationFolders}
+            defaultFolderRef={currentFolder ? String(currentFolder.id) : ''}
+            isBusy={isPending}
+            onCreateFolder={handleCreateFolderFromComposer}
+            onUploadDocument={handleUploadFromComposer}
+          />
         </div>
 
         {/* Liste */}
@@ -216,20 +289,41 @@ export default function DocumentsPanel({ open, onClose, entityType, entityId, en
                 <div key={i} className="h-12 bg-[#262626]/30 rounded animate-pulse" />
               ))}
             </div>
-          ) : documents.length === 0 ? (
+          ) : folders.length === 0 && documents.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center px-6">
               <FileText className="h-8 w-8 text-[#262626] mb-2" />
-              <p className="text-xs text-[#525252]">Aucun document</p>
+              <p className="text-xs text-[#525252]">{folders.length === 0 ? 'Aucun document ni dossier' : 'Aucun document dans ce niveau'}</p>
             </div>
           ) : (
             <ul className="divide-y divide-[#262626]/50">
-              {documents.map((doc) => (
+              {folders.map((folder: DocumentFolder) => (
+                <li key={`folder-${folder.id}`} className="flex items-center gap-2 px-4 py-3 hover:bg-[#161616] transition-colors">
+                  <button
+                    onClick={() => openFolder(folder)}
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                  >
+                    <Folder className="h-3.5 w-3.5 text-[#eab308] shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs text-white truncate">{folder.nom}</p>
+                      <p className="text-[9px] text-[#525252]">Dossier</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteFolder(folder)}
+                    className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors"
+                    title="Supprimer le dossier"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+              {documents.map((doc: Document) => (
                 <li key={doc.id} className={`flex items-center gap-2 px-4 py-3 transition-colors ${previewDoc?.id === doc.id ? 'bg-[#1a1a1a]' : 'hover:bg-[#161616]'}`}>
                   <Paperclip className="h-3.5 w-3.5 text-[#525252] shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-white truncate">{doc.nom_fichier}</p>
                     <p className="text-[9px] text-[#525252]">
-                      {TYPE_DOCUMENT_LABELS[doc.type_document]} · {formatDate(doc.uploaded_at)}
+                      {formatDate(doc.uploaded_at)}
                     </p>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0">

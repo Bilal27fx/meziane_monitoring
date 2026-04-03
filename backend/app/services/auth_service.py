@@ -22,8 +22,8 @@ from sqlalchemy.orm import Session
 from app.models.user import User, UserRole
 from app.config import settings
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8   # 8h
-REFRESH_TOKEN_EXPIRE_DAYS = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 30    # RFC-008: 30 min (était 8h — trop long pour app financière)
+REFRESH_TOKEN_EXPIRE_DAYS = 14     # RFC-008: 14 jours avec rotation
 
 
 def hash_password(password: str) -> str:
@@ -34,15 +34,23 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return _bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
-def create_access_token(user_id: int, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(user: "User", expires_delta: Optional[timedelta] = None) -> str:
+    """RFC-008: inclut role dans le payload pour éviter la requête DB par request"""
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    payload = {"sub": str(user_id), "type": "access", "exp": expire}
+    payload = {
+        "sub": str(user.id),
+        "type": "access",
+        "exp": expire,
+        "role": user.role.value,
+        "is_active": user.is_active,
+    }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
 def create_refresh_token(user_id: int) -> str:
+    import uuid
     expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    payload = {"sub": str(user_id), "type": "refresh", "exp": expire}
+    payload = {"sub": str(user_id), "type": "refresh", "exp": expire, "jti": str(uuid.uuid4())}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
@@ -50,7 +58,7 @@ class AuthService:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_user(self, email: str, password: str, nom: str = None, prenom: str = None, role: UserRole = UserRole.USER) -> User:
+    def create_user(self, email: str, password: str, nom: str = None, prenom: str = None, role: UserRole = UserRole.USER) -> "User":
         user = User(
             email=email,
             hashed_password=hash_password(password),

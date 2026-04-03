@@ -22,9 +22,9 @@ from app.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-@celery_app.task(name="app.tasks.quittance_tasks.generate_quittances_task", bind=True)
+@celery_app.task(name="app.tasks.quittance_tasks.generate_quittances_task", bind=True, max_retries=3)
 def generate_quittances_task(self, mois: int = None, annee: int = None):
-    """Génère les quittances pour tous les baux actifs du mois"""
+    """Génère les quittances pour tous les baux actifs du mois (RFC-008: batch check + max_retries)"""
     from app.models.bail import Bail, StatutBail
     from app.models.quittance import Quittance, StatutQuittance
 
@@ -37,23 +37,26 @@ def generate_quittances_task(self, mois: int = None, annee: int = None):
     db = SessionLocal()
     try:
         baux_actifs = db.query(Bail).filter(Bail.statut == StatutBail.ACTIF).all()
+        bail_ids = [b.id for b in baux_actifs]
+
+        # RFC-008: 1 requête batch pour trouver toutes les quittances existantes du mois
+        existing_bail_ids = set(
+            row.bail_id for row in db.query(Quittance.bail_id).filter(
+                Quittance.bail_id.in_(bail_ids),
+                Quittance.mois == mois,
+                Quittance.annee == annee,
+            ).all()
+        )
 
         created = 0
         skipped = 0
+        nouvelles = []
 
         for bail in baux_actifs:
-            # Vérifie si quittance déjà générée
-            existing = db.query(Quittance).filter(
-                Quittance.bail_id == bail.id,
-                Quittance.mois == mois,
-                Quittance.annee == annee,
-            ).first()
-
-            if existing:
+            if bail.id in existing_bail_ids:
                 skipped += 1
                 continue
-
-            quittance = Quittance(
+            nouvelles.append(Quittance(
                 bail_id=bail.id,
                 mois=mois,
                 annee=annee,
@@ -61,10 +64,11 @@ def generate_quittances_task(self, mois: int = None, annee: int = None):
                 montant_charges=bail.charges_mensuelles or 0,
                 montant_total=bail.loyer_mensuel + (bail.charges_mensuelles or 0),
                 statut=StatutQuittance.EN_ATTENTE,
-            )
-            db.add(quittance)
+            ))
             created += 1
 
+        if nouvelles:
+            db.add_all(nouvelles)
         db.commit()
         result = {"created": created, "skipped": skipped, "mois": mois, "annee": annee}
         logger.info(f"generate_quittances_task terminé: {result}")
@@ -73,32 +77,35 @@ def generate_quittances_task(self, mois: int = None, annee: int = None):
     except Exception as exc:
         db.rollback()
         logger.error(f"generate_quittances_task échoué: {exc}")
-        raise
+        raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1))
     finally:
         db.close()
 
 
-@celery_app.task(name="app.tasks.quittance_tasks.send_alerte_impayes_task", bind=True)
+@celery_app.task(name="app.tasks.quittance_tasks.send_alerte_impayes_task", bind=True, max_retries=3)
 def send_alerte_impayes_task(self):
-    """Détecte les impayés et prépare les alertes — job hebdomadaire"""
+    """Détecte les impayés et prépare les alertes (RFC-008: joinedload → 1 requête au lieu de N×2)"""
     from app.models.quittance import Quittance, StatutQuittance
     from app.models.bail import Bail
     from app.models.locataire import Locataire
+    from sqlalchemy.orm import joinedload
 
     logger.info("Démarrage send_alerte_impayes_task")
 
     db = SessionLocal()
     try:
+        # RFC-008: 1 requête avec joinedload au lieu de N×2 requêtes séparées
         impayes = db.query(Quittance).filter(
             Quittance.statut.in_([StatutQuittance.IMPAYE, StatutQuittance.PARTIEL])
+        ).options(
+            joinedload(Quittance.bail).joinedload(Bail.locataire)
         ).all()
 
         alertes = []
         for q in impayes:
-            bail = db.query(Bail).filter(Bail.id == q.bail_id).first()
-            if not bail:
+            if not q.bail:
                 continue
-            locataire = db.query(Locataire).filter(Locataire.id == bail.locataire_id).first()
+            locataire = q.bail.locataire
             alertes.append({
                 "quittance_id": q.id,
                 "locataire": f"{locataire.prenom} {locataire.nom}" if locataire else "Inconnu",
@@ -115,6 +122,6 @@ def send_alerte_impayes_task(self):
 
     except Exception as exc:
         logger.error(f"send_alerte_impayes_task échoué: {exc}")
-        raise
+        raise self.retry(exc=exc, countdown=60 * (self.request.retries + 1))
     finally:
         db.close()

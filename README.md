@@ -1,124 +1,144 @@
-# Meziane Monitoring System
+# Meziane Monitoring
 
-Système de monitoring et gestion patrimoine immobilier avec agents IA.
+Plateforme de pilotage de patrimoine immobilier avec backend FastAPI, dashboard Next.js, jobs asynchrones et documentation d'architecture.
 
-## 📋 Documentation
+## Vue rapide
 
-- **[PROFIL_ET_OBJECTIFS.md](./PROFIL_ET_OBJECTIFS.md)** - Profil Bilal, objectifs business
-- **[ARCHITECTURE_SYSTEME.md](./ARCHITECTURE_SYSTEME.md)** - Architecture complète du système
-- **[CLAUDE_INSTRUCTIONS.md](./CLAUDE_INSTRUCTIONS.md)** - Règles développement
+Le repo est organisé en trois blocs:
+- `backend/`: API, modèles, services métier, tâches Celery, stockage et auth.
+- `frontend/`: dashboard, espace agent, back-office admin.
+- `docs/`: architecture, suivi des RFC, historique, refactors livrés.
 
-## 🚀 Quick Start
+## Démarrage
 
-### 1. Configuration
-```bash
-cp .env.example .env
-# Éditer .env avec tes credentials
-```
+### 1. Infrastructure locale
 
-### 2. Lancer infrastructure
 ```bash
 docker-compose up -d
 ```
 
-Services disponibles :
-- PostgreSQL : `localhost:5432`
-- Redis : `localhost:6379`
-- MinIO : `localhost:9000` (UI: `localhost:9001`)
+Services exposés:
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+- MinIO API: `localhost:9000`
+- MinIO Console: `localhost:9001`
+- Worker Celery: service `worker`
 
-### 3. Setup Backend
+### 2. Backend
+
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# Migrations DB
 alembic upgrade head
-
-# Lancer API
 uvicorn app.main:app --reload
 ```
 
-API : http://localhost:8000
+API:
+- base: `http://localhost:8000`
+- docs Swagger: `http://localhost:8000/docs`
 
-### 4. Setup Frontend (à venir)
+### 3. Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-## 🏗️ Stack Technique
+App:
+- web: `http://localhost:3000`
 
-**Backend**
+## Stack
+
+### Backend
 - Python 3.11+
 - FastAPI
-- SQLAlchemy + PostgreSQL
+- SQLAlchemy
+- Alembic
+- PostgreSQL
 - Redis
-- LangGraph + Claude
+- Celery
 
-**Storage**
-- PostgreSQL 15
-- MinIO (S3-compatible)
-- Redis 7
-
-**Frontend** (à venir)
-- Next.js 14
-- React
+### Frontend
+- Next.js 16
+- React 19
 - TypeScript
-- Tailwind CSS
+- Tailwind CSS 4
+- TanStack Query
+- Zustand
 
-## 📁 Structure Projet
-
-```
-meziane_monitoring/
-├── backend/            # API FastAPI + services
-├── frontend/           # Dashboard Next.js (à venir)
-├── docs/               # Documentation
-├── docker-compose.yml  # Infrastructure
-└── .env.example        # Variables d'environnement
-```
-
-## 🎯 Phase Actuelle
-
-**Phase 1 : Infrastructure & Base** ✅
+### Infra et stockage
 - Docker Compose
-- Modèles SQLAlchemy
-- Migrations Alembic
-- Structure backend
+- PostgreSQL 15
+- Redis 7
+- MinIO
+- GitNexus pour l'analyse d'impact
 
-**Phase 2 : Ingestion Données** (en cours)
-- Banking Connector
-- Transaction Parser
-- Categorizer IA
+## Documentation
 
-## 📝 Commandes Utiles
+Commencer ici:
+- [CLAUDE.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/CLAUDE.md): règles de travail, GitNexus, conventions.
+- [docs/README.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/README.md): index documentaire complet.
+
+Docs principales:
+- [PROFIL_ET_OBJECTIFS.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/architecture/PROFIL_ET_OBJECTIFS.md)
+- [ARCHITECTURE_SYSTEME.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/architecture/ARCHITECTURE_SYSTEME.md)
+- [FRONTEND_ARCHITECTURE.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/architecture/FRONTEND_ARCHITECTURE.md)
+- [PLAN.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/PLAN.md)
+- [TRACKING.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/TRACKING.md)
+
+## Structure
+
+```text
+Meziane_Monitoring/
+├── backend/
+├── frontend/
+├── docs/
+├── docker-compose.yml
+├── Dockerfile.gitnexus
+├── AGENTS.md
+├── CLAUDE.md
+└── README.md
+```
+
+## Commandes utiles
 
 ```bash
-# Infrastructure
+# Infra
 docker-compose up -d
 docker-compose logs -f
 docker-compose down
 
 # Backend
 cd backend
-uvicorn app.main:app --reload
-alembic revision --autogenerate -m "Description"
 alembic upgrade head
+uvicorn app.main:app --reload
 pytest
 
-# Format
-black backend/app
-ruff check backend/app
+# Frontend
+cd frontend
+npm run dev
+npm run build
+
+# GitNexus
+cat .gitnexus/meta.json
+npx gitnexus analyze
 ```
 
-## 🔐 Sécurité
+## Sécurité et configuration
 
-- Ne jamais commit `.env`
-- API keys dans variables d'environnement
-- `.env.example` fourni sans vraies valeurs
+- Ne jamais commit de secrets.
+- Les variables d'environnement sensibles doivent rester hors du repo.
+- Vérifier les valeurs par défaut de `SECRET_KEY`, `DATABASE_URL` et des accès MinIO avant tout déploiement.
 
-## 👤 Développeur
+## Etat du projet
 
-Bilal Meziane - Objectif : 20 appartements d'ici 2030
+Le projet dispose déjà:
+- d'un backend structuré par domaines
+- d'un frontend avec dashboard, agent et admin
+- d'une couche documentaire riche
+- d'un historique de refactors et RFC dans `docs/refactors/`
+
+L'état détaillé des chantiers en cours et terminés est suivi dans [docs/TRACKING.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/TRACKING.md).

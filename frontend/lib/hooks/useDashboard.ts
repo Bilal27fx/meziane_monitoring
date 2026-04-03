@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api/client'
-import type { DashboardFull, Locataire, Opportunite } from '@/lib/types'
+import type { DashboardFull, LocataireOverview, OpportuniteOverview } from '@/lib/types'
 
 export function useFullDashboard() {
   return useQuery<DashboardFull>({
@@ -17,10 +17,10 @@ export function useFullDashboard() {
 }
 
 export function useDashboardLocataires() {
-  return useQuery<Locataire[]>({
+  return useQuery<LocataireOverview[]>({
     queryKey: ['dashboard', 'locataires'],
     queryFn: async () => {
-      const response = await api.get<{ data: Locataire[] }>('/api/dashboard/locataires')
+      const response = await api.get<{ data: LocataireOverview[] }>('/api/dashboard/locataires')
       return response.data.data
     },
     refetchInterval: 30_000,
@@ -29,10 +29,10 @@ export function useDashboardLocataires() {
 }
 
 export function useDashboardOpportunites(limit = 2) {
-  return useQuery<Opportunite[]>({
+  return useQuery<OpportuniteOverview[]>({
     queryKey: ['dashboard', 'opportunites', limit],
     queryFn: async () => {
-      const response = await api.get<{ data: Opportunite[] }>('/api/dashboard/opportunites', {
+      const response = await api.get<{ data: OpportuniteOverview[] }>('/api/dashboard/opportunites', {
         params: { limit },
       })
       return response.data.data

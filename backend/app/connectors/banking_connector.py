@@ -46,7 +46,7 @@ class BankingConnectorService:  # Service connexion et récupération données b
             return False
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:  # RFC-007: timeout explicite
                 response = await client.post(
                     f"{self.BASE_URL}/authenticate",
                     json={
@@ -68,7 +68,7 @@ class BankingConnectorService:  # Service connexion et récupération données b
 
     async def list_banks(self) -> List[Dict]:  # Liste toutes les banques supportées
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
                     f"{self.BASE_URL}/banks",
                     headers=self.get_headers()
@@ -82,7 +82,7 @@ class BankingConnectorService:  # Service connexion et récupération données b
 
     async def get_user_accounts(self, user_uuid: str) -> List[Dict]:  # Récupère comptes bancaires d'un utilisateur Bridge
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(
                     f"{self.BASE_URL}/accounts",
                     headers=self.get_headers(),
@@ -108,7 +108,7 @@ class BankingConnectorService:  # Service connexion et récupération données b
             until = datetime.now().strftime("%Y-%m-%d")
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:  # RFC-007: 60s pour les transactions
                 response = await client.get(
                     f"{self.BASE_URL}/accounts/{account_id}/transactions",
                     headers=self.get_headers(),
@@ -123,7 +123,7 @@ class BankingConnectorService:  # Service connexion et récupération données b
 
     async def sync_account(self, account_id: int) -> bool:  # Déclenche synchronisation compte bancaire
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     f"{self.BASE_URL}/accounts/{account_id}/sync",
                     headers=self.get_headers()
@@ -138,7 +138,7 @@ class BankingConnectorService:  # Service connexion et récupération données b
 
     async def create_item(self, bank_id: int, redirect_url: str) -> Dict:  # Crée item Bridge pour connexion banque utilisateur
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     f"{self.BASE_URL}/items",
                     headers=self.get_headers(),

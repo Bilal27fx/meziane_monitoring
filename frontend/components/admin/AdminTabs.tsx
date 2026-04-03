@@ -1,6 +1,7 @@
 'use client'
 
 import * as Tabs from '@radix-ui/react-tabs'
+import { useSearchParams } from 'next/navigation'
 import SCITab from './tabs/SCITab'
 import BiensTab from './tabs/BiensTab'
 import LocatairesTab from './tabs/LocatairesTab'
@@ -16,8 +17,12 @@ const TABS = [
 ]
 
 export default function AdminTabs() {
+  const searchParams = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const defaultTab = TABS.some((tab) => tab.value === requestedTab) ? requestedTab! : 'sci'
+
   return (
-    <Tabs.Root defaultValue="sci" className="flex flex-col h-full">
+    <Tabs.Root defaultValue={defaultTab} className="flex flex-col h-full">
       <Tabs.List className="flex items-center gap-0 border-b border-[#262626] flex-shrink-0">
         {TABS.map(({ value, label }) => (
           <Tabs.Trigger

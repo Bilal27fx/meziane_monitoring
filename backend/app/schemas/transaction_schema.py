@@ -14,9 +14,9 @@ Utilisé par:
 - services.transaction_service
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, Dict
-from datetime import date
+from pydantic import BaseModel, Field, computed_field
+from typing import Optional, Dict, List
+from datetime import date, datetime
 from enum import Enum
 
 
@@ -71,10 +71,28 @@ class TransactionResponse(TransactionBase):  # Schema réponse API avec ID et m�
     statut_validation: StatutValidation
     valide_par: Optional[str] = None
     date_validation: Optional[date] = None
-    created_at: date
+    created_at: datetime
+
+    @computed_field
+    @property
+    def statut(self) -> str:
+        return self.statut_validation.value
+
+    @computed_field
+    @property
+    def type(self) -> str:
+        return 'revenu' if self.montant > 0 else 'depense'
 
     class Config:
         from_attributes = True
+
+
+class TransactionPaginatedResponse(BaseModel):
+    items: List[TransactionResponse]
+    total: int
+    page: int
+    per_page: int
+    pages: int
 
 
 class TransactionCategorizeRequest(BaseModel):  # Schema pour demande de catégorisation IA

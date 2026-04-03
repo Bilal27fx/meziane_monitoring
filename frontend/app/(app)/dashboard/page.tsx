@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, TrendingUp, Users, DollarSign } from 'lucide-react'
+import { Bell, Building2, DollarSign, TrendingUp } from 'lucide-react'
 import KPICard from '@/components/dashboard/KPICard'
 import CashflowChart from '@/components/dashboard/CashflowChart'
 import PatrimoineChart from '@/components/dashboard/PatrimoineChart'
@@ -22,62 +22,67 @@ function formatKPI(value: number): string {
 
 export default function DashboardPage() {
   const { data, isLoading } = useFullDashboard()
-  const kpis = data?.kpis
+  const kpi = data?.kpi
+
+  const cashflowChartData = data?.cashflow_30days?.map(d => ({ date: d.date, value: d.net }))
+  const patrimoineChartData = data?.patrimoine_12months?.map(d => ({ date: d.date, value: d.valeur }))
+  const performanceYtd = kpi?.performance_ytd ?? 0
+  const alertesActives = kpi?.nb_alertes ?? 0
 
   return (
-    <div className="h-[calc(100vh-56px)] p-3 overflow-hidden">
+    <div className="min-h-[calc(100vh-56px)] p-4 overflow-y-auto">
       <div
-        className="grid grid-cols-12 gap-2"
-        style={{ gridTemplateRows: '56px 192px 192px 192px', height: '100%' }}
+        className="grid grid-cols-12 gap-3"
+        style={{ gridTemplateRows: 'auto auto auto auto' }}
       >
         {/* Row 1 — KPI cards */}
         <div className="col-span-3">
           <KPICard
             title="Patrimoine net"
-            value={isLoading ? '…' : formatKPI(kpis?.patrimoine_net ?? 0)}
-            change={kpis?.patrimoine_net_change}
-            trend={kpis?.patrimoine_net_change !== undefined ? (kpis.patrimoine_net_change >= 0 ? 'up' : 'down') : undefined}
+            value={isLoading ? '…' : formatKPI(kpi?.patrimoine_net ?? 0)}
+            change={isLoading ? undefined : performanceYtd}
+            trend={performanceYtd >= 0 ? 'up' : 'down'}
             icon={Building2}
           />
         </div>
         <div className="col-span-3">
           <KPICard
-            title="Cashflow mensuel"
-            value={isLoading ? '…' : formatCurrency(kpis?.cashflow_mensuel ?? 0)}
-            change={kpis?.cashflow_mensuel_change}
-            trend={kpis?.cashflow_mensuel_change !== undefined ? (kpis.cashflow_mensuel_change >= 0 ? 'up' : 'down') : undefined}
+            title="Cashflow ce mois"
+            value={isLoading ? '…' : formatCurrency(kpi?.cashflow_today ?? 0)}
             icon={DollarSign}
           />
         </div>
         <div className="col-span-3">
           <KPICard
-            title="Taux d'occupation"
-            value={isLoading ? '…' : `${kpis?.taux_occupation?.toFixed(1) ?? '—'}%`}
-            change={kpis?.taux_occupation_change}
-            trend={kpis?.taux_occupation_change !== undefined ? (kpis.taux_occupation_change >= 0 ? 'up' : 'down') : undefined}
-            icon={TrendingUp}
+            title="Alertes actives"
+            value={isLoading ? '…' : String(alertesActives)}
+            trend={alertesActives > 0 ? 'down' : 'up'}
+            subtitle={data ? `${kpi?.nb_locataires_actifs ?? 0} locataires actifs` : undefined}
+            icon={Bell}
           />
         </div>
         <div className="col-span-3">
           <KPICard
-            title="Biens en portefeuille"
-            value={isLoading ? '…' : String(kpis?.nb_biens ?? '—')}
-            icon={Users}
-            subtitle={data ? `${data.sci_overview.length} SCI · ${data.locataires_actifs} locataires` : undefined}
+            title="Performance YTD"
+            value={isLoading ? '…' : `${performanceYtd > 0 ? '+' : ''}${performanceYtd.toFixed(1)}%`}
+            change={isLoading ? undefined : performanceYtd}
+            trend={performanceYtd >= 0 ? 'up' : 'down'}
+            subtitle={data ? `${data.sci_overview.length} SCI suivies` : undefined}
+            icon={TrendingUp}
           />
         </div>
 
-        {/* Row 2 — Charts + SCI + Top5 (row-span-3) */}
+        {/* Row 2 — Charts + SCI + Top5 */}
         <div className="col-span-3">
-          <CashflowChart data={data?.cashflow_history} />
+          <CashflowChart data={cashflowChartData} />
         </div>
         <div className="col-span-3">
-          <PatrimoineChart data={data?.patrimoine_history} />
+          <PatrimoineChart data={patrimoineChartData} />
         </div>
         <div className="col-span-3">
           <SCIOverview data={data?.sci_overview} />
         </div>
-        <div className="col-span-3 row-span-3">
+        <div className="col-span-3 row-span-2">
           <Top5Biens data={data?.top_biens} />
         </div>
 
@@ -90,11 +95,11 @@ export default function DashboardPage() {
         <div className="col-span-3">
           <SimulationForm />
         </div>
-        <div className="col-span-3">
-          <OpportunitesWidget />
+        <div className="col-span-4">
+          <OpportunitesWidget data={data?.opportunites} isLoading={isLoading} />
         </div>
-        <div className="col-span-3">
-          <LocatairesCards />
+        <div className="col-span-5">
+          <LocatairesCards data={data?.locataires} isLoading={isLoading} />
         </div>
       </div>
     </div>
