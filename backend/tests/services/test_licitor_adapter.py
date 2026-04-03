@@ -63,6 +63,7 @@ def test_parse_listing_detail_extracts_documents_and_contact_facts():
         <h1>Un appartement a Paris 17eme</h1>
         <p>Mise a prix : 380 000 EUR</p>
         <p>Surface : 103,70 m²</p>
+        <p>Appartement de 4 pieces avec 2 chambres au 3eme etage avec ascenseur, balcon, cave et parking</p>
         <p>Bien occupe</p>
         <p>Visites : mardi 10 mars 2026 de 14h a 15h</p>
         <p>Me Dupont - 01 40 00 00 00</p>
@@ -99,6 +100,16 @@ def test_parse_listing_detail_extracts_documents_and_contact_facts():
     assert detail.facts["title"] == "Un appartement a Paris 17eme"
     assert detail.facts["reserve_price"] == 380000
     assert detail.facts["surface_m2"] == 103.70
+    assert detail.facts["nb_pieces"] == 4
+    assert detail.facts["nb_chambres"] == 2
+    assert detail.facts["etage"] == 3
+    assert detail.facts["type_etage"] == "etage"
+    assert detail.facts["ascenseur"] is True
+    assert detail.facts["balcon"] is True
+    assert detail.facts["cave"] is True
+    assert detail.facts["parking"] is True
     assert detail.facts["occupancy_status"] == "occupe"
     assert detail.facts["lawyer_phone"] == "01 40 00 00 00"
     assert detail.facts["documents"] == ["https://www.licitor.com/pdf/ccv.pdf"]
+    assert detail.facts["property_details"]["room_count"] == 4
+    assert detail.facts["property_details"]["amenities"]["ascenseur"] is True

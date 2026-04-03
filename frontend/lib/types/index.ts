@@ -374,16 +374,41 @@ export interface AuctionListing {
   postal_code?: string | null
   address?: string | null
   surface_m2?: number | null
+  nb_pieces?: number | null
+  nb_chambres?: number | null
+  etage?: number | null
+  type_etage?: string | null
+  ascenseur?: boolean | null
+  balcon?: boolean | null
+  terrasse?: boolean | null
+  cave?: boolean | null
+  parking?: boolean | null
+  box?: boolean | null
+  jardin?: boolean | null
+  property_details?: Record<string, unknown> | null
   occupancy_status?: string | null
+  visit_dates?: string[] | null
+  auction_date?: string | null
   status: 'discovered' | 'normalized' | 'enriched' | 'shortlisted' | 'rejected'
   published_at?: string | null
   last_seen_at: string
   created_at: string
   updated_at: string
+  // Scoring LLM
+  score_global?: number | null
+  score_localisation?: number | null
+  score_prix?: number | null
+  score_potentiel?: number | null
+  loyer_estime?: number | null
+  rentabilite_brute?: number | null
+  raison_score?: string | null
+  risques_llm?: string[] | null
+  recommandation?: 'fort_potentiel' | 'a_surveiller' | 'rejeter' | null
+  scored_at?: string | null
 }
 
 export interface AuctionQuickLaunchPayload {
-  audience_urls: string[]
+  audience_urls?: string[]
   auto_dispatch?: boolean
 }
 

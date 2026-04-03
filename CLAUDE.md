@@ -12,14 +12,14 @@ Lire ces documents avant toute tâche non triviale:
 2. `docs/architecture/ARCHITECTURE_SYSTEME.md`
 3. `docs/architecture/FRONTEND_ARCHITECTURE.md`
 4. `docs/TRACKING.md`
-5. `docs/PLAN.md`
 
 Rôle de chaque document:
 - `PROFIL_ET_OBJECTIFS.md`: contexte business, objectifs, contraintes métier.
 - `ARCHITECTURE_SYSTEME.md`: architecture cible backend, flux de données, domaines.
 - `FRONTEND_ARCHITECTURE.md`: vision UI, structure des pages, conventions frontend.
-- `TRACKING.md`: journal des RFC et refactors terminés.
-- `PLAN.md`: état d'avancement et axes de travail actifs.
+- `TRACKING.md`: état vivant — backlog, en cours, terminé. Contient les liens vers les plans (`docs/plans/`) et les refactor docs (`docs/refactors/`).
+
+Règle lifecycle documentaire: voir `docs/STANDARDS.md`.
 
 Règles d'interprétation:
 - Les docs d'architecture donnent la direction.
@@ -84,23 +84,11 @@ rg "from app\\.module import NomClasse|import .*NomClasse" backend frontend
 
 Après toute modification de code:
 
-1. Créer un document dans `docs/refactors/`
-2. Décrire la modification, les fichiers touchés, l'impact et les tests
-3. Relancer l'analyse GitNexus
-4. Vérifier que l'index est bien mis à jour
+1. Créer `docs/refactors/YYYY-MM-DD_nom-court.md` (format dans `docs/STANDARDS.md`)
+2. Mettre à jour `docs/TRACKING.md` : statut `Terminé` + lien vers le refactor doc
+3. Relancer `npx gitnexus analyze`
 
-Format recommandé du document de refactor:
-- `YYYY-MM-DD_nom_modification.md`
-
-Contenu minimum:
-- contexte
-- changements effectués
-- fichiers impactés
-- impact d=1 / d=2 / d=3 si pertinent
-- tests effectués
-- impact architectural
-
-Sans document dans `docs/refactors/`, la modification est incomplète.
+Sans refactor doc + mise à jour TRACKING.md, la modification est incomplète.
 
 ## 4. Règles de développement
 
@@ -260,7 +248,7 @@ Remarques:
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **workspace** (2660 symbols, 4868 relationships, 82 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **meziane_monitoring** (2050 symbols, 4307 relationships, 85 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -276,7 +264,7 @@ This project is indexed by GitNexus as **workspace** (2660 symbols, 4868 relatio
 
 1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
 2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ gitnexus://repo/workspace/process/{processName}` — trace the full execution flow step by step
+3. `READ gitnexus://repo/meziane_monitoring/process/{processName}` — trace the full execution flow step by step
 4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
 
 ## When Refactoring
@@ -315,10 +303,10 @@ This project is indexed by GitNexus as **workspace** (2660 symbols, 4868 relatio
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/workspace/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/workspace/clusters` | All functional areas |
-| `gitnexus://repo/workspace/processes` | All execution flows |
-| `gitnexus://repo/workspace/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/meziane_monitoring/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/meziane_monitoring/clusters` | All functional areas |
+| `gitnexus://repo/meziane_monitoring/processes` | All execution flows |
+| `gitnexus://repo/meziane_monitoring/process/{name}` | Step-by-step execution trace |
 
 ## Self-Check Before Finishing
 

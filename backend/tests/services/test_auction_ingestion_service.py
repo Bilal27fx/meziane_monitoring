@@ -60,6 +60,7 @@ def _build_run(db_session, source_code: str = "licitor"):
                             <h1>Un appartement a Paris 17eme</h1>
                             <p>Mise a prix : 380 000 EUR</p>
                             <p>Surface : 103,70 m²</p>
+                            <p>Appartement de 4 pieces avec 2 chambres au 3eme etage avec ascenseur, balcon et cave</p>
                             <p>Bien occupe</p>
                             <p>Adresse : 12 rue de Tocqueville, 75017 Paris</p>
                             <p>Visites : mardi 10 mars 2026 de 14h a 15h</p>
@@ -92,6 +93,13 @@ def test_execute_auction_ingestion_run_persists_session_and_listing(db_session):
     assert listing.status == AuctionListingStatus.NORMALIZED
     assert listing.listing_type == "appartement"
     assert listing.address == "12 rue de Tocqueville, 75017 Paris"
+    assert listing.nb_pieces == 4
+    assert listing.nb_chambres == 2
+    assert listing.etage == 3
+    assert listing.ascenseur is True
+    assert listing.balcon is True
+    assert listing.cave is True
+    assert listing.property_details["room_count"] == 4
     assert listing.occupancy_status == "occupe"
     assert [event.event_type for event in events] == [
         "run_started",
@@ -130,6 +138,7 @@ def test_execute_auction_ingestion_run_is_idempotent_for_existing_records(db_ses
                         <h1>Un appartement a Paris 17eme</h1>
                         <p>Mise a prix : 380 000 EUR</p>
                         <p>Surface : 103,70 m²</p>
+                        <p>Appartement de 4 pieces au 3eme etage avec ascenseur</p>
                         <p>Bien occupe</p>
                         <p>Adresse : 12 rue de Tocqueville, 75017 Paris</p>
                       </body>
@@ -201,6 +210,7 @@ def test_execute_auction_ingestion_run_fetches_session_urls_when_html_not_preloa
                         <h1>Un appartement a Paris 17eme</h1>
                         <p>Mise a prix : 380 000 EUR</p>
                         <p>Surface : 103,70 m²</p>
+                        <p>Appartement de 2 pieces en rez-de-chaussee sans ascenseur</p>
                         <p>Bien occupe</p>
                       </body>
                     </html>

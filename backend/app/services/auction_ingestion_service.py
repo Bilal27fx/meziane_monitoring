@@ -22,6 +22,7 @@ from app.models.auction_session import AuctionSession, AuctionSessionStatus
 from app.models.auction_source import AuctionSource
 from app.services.auction_fetch_service import AuctionFetchService
 from app.services.auction_run_log_service import log_agent_run_event
+from app.services.auction_scoring_service import score_listing
 
 
 def build_source_adapter(source_code: str) -> SourceAdapter:
@@ -41,6 +42,7 @@ class AuctionIngestionService:
         page_url: str,
         session_html: str,
         detail_pages: dict[str, str] | None = None,
+        pages_html: dict[str, str] | None = None,
     ) -> dict[str, int]:
         detail_pages = detail_pages or {}
         counters = {
@@ -49,6 +51,7 @@ class AuctionIngestionService:
             "listings_created": 0,
             "listings_updated": 0,
             "listings_normalized": 0,
+            "listings_scored": 0,
         }
 
         raw_sessions = self.adapter.parse_sessions(session_html, page_url)
@@ -56,16 +59,26 @@ class AuctionIngestionService:
             session, session_created = self._upsert_session(source, raw_session)
             counters["sessions_created" if session_created else "sessions_updated"] += 1
 
-            raw_listings = self.adapter.parse_listing_cards(session_html, page_url, raw_session)
-            for raw_listing in raw_listings:
-                listing, listing_created = self._upsert_listing(source, session, raw_listing)
-                counters["listings_created" if listing_created else "listings_updated"] += 1
+            html_sources = list(pages_html.items()) if pages_html else [(page_url, session_html)]
+            seen_listing_urls: set[str] = set()
+            for ph_url, ph_html in html_sources:
+                for raw_listing in self.adapter.parse_listing_cards(ph_html, ph_url, raw_session):
+                    if raw_listing.source_url in seen_listing_urls:
+                        continue
+                    seen_listing_urls.add(raw_listing.source_url)
+                    listing, listing_created = self._upsert_listing(source, session, raw_listing)
+                    counters["listings_created" if listing_created else "listings_updated"] += 1
 
-                detail_html = detail_pages.get(listing.source_url)
-                if detail_html:
-                    detail = self.adapter.parse_listing_detail(detail_html, listing.source_url, raw_listing)
-                    self._apply_listing_detail(listing, detail.facts)
-                    counters["listings_normalized"] += 1
+                    detail_html = detail_pages.get(listing.source_url)
+                    if detail_html:
+                        detail = self.adapter.parse_listing_detail(detail_html, listing.source_url, raw_listing)
+                        self._apply_listing_detail(listing, detail.facts)
+                        counters["listings_normalized"] += 1
+
+                        if listing.score_global is None:
+                            scored = score_listing(listing, self.db)
+                            if scored:
+                                counters["listings_scored"] += 1
 
         self.db.commit()
         return counters
@@ -150,9 +163,31 @@ class AuctionIngestionService:
         listing.title = facts.get("title") or listing.title
         listing.reserve_price = facts.get("reserve_price") or listing.reserve_price
         listing.surface_m2 = facts.get("surface_m2") or listing.surface_m2
+        listing.nb_pieces = facts.get("nb_pieces") or listing.nb_pieces
+        listing.nb_chambres = facts.get("nb_chambres") or listing.nb_chambres
+        listing.etage = facts.get("etage") if facts.get("etage") is not None else listing.etage
+        listing.type_etage = facts.get("type_etage") or listing.type_etage
+        if facts.get("ascenseur") is not None:
+            listing.ascenseur = facts["ascenseur"]
+        if facts.get("balcon") is not None:
+            listing.balcon = facts["balcon"]
+        if facts.get("terrasse") is not None:
+            listing.terrasse = facts["terrasse"]
+        if facts.get("cave") is not None:
+            listing.cave = facts["cave"]
+        if facts.get("parking") is not None:
+            listing.parking = facts["parking"]
+        if facts.get("box") is not None:
+            listing.box = facts["box"]
+        if facts.get("jardin") is not None:
+            listing.jardin = facts["jardin"]
+        if facts.get("property_details"):
+            listing.property_details = facts["property_details"]
         listing.postal_code = facts.get("postal_code") or listing.postal_code
         listing.address = facts.get("address") or listing.address
         listing.occupancy_status = facts.get("occupancy_status") or listing.occupancy_status
+        if facts.get("visit_dates"):
+            listing.visit_dates = facts["visit_dates"]
         listing.status = AuctionListingStatus.NORMALIZED
         listing.last_seen_at = datetime.utcnow()
 
@@ -228,6 +263,7 @@ def execute_auction_ingestion_run(db: Session, run_id: int) -> dict[str, Any]:
         "listings_created": 0,
         "listings_updated": 0,
         "listings_normalized": 0,
+        "listings_scored": 0,
         "session_pages_processed": 0,
     }
 
@@ -251,6 +287,7 @@ def execute_auction_ingestion_run(db: Session, run_id: int) -> dict[str, Any]:
                 page_url=page_url,
                 session_html=page_html,
                 detail_pages=page.get("detail_pages"),
+                pages_html=page.get("pages_html"),
             )
             log_agent_run_event(
                 db,

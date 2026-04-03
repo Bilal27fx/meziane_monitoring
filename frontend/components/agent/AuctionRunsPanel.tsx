@@ -26,6 +26,19 @@ function statusClasses(status: AuctionAgentRun['status']) {
   }
 }
 
+function listingStatusClasses(status: AuctionListing['status']) {
+  switch (status) {
+    case 'normalized':
+      return 'text-[#3b82f6] border-[#3b82f6]/30 bg-[#3b82f6]/10'
+    case 'shortlisted':
+      return 'text-[#22c55e] border-[#22c55e]/30 bg-[#22c55e]/10'
+    case 'rejected':
+      return 'text-[#ef4444] border-[#ef4444]/30 bg-[#ef4444]/10'
+    default:
+      return 'text-[#a3a3a3] border-[#404040] bg-[#171717]'
+  }
+}
+
 function levelClasses(level: AuctionAgentRunEvent['level']) {
   switch (level) {
     case 'error':
@@ -60,6 +73,7 @@ function summarizePayload(payload?: Record<string, unknown> | null) {
     'listings_created',
     'listings_updated',
     'listings_normalized',
+    'listings_scored',
     'session_pages_processed',
   ]
 
@@ -88,24 +102,13 @@ function formatCurrency(value?: number | null) {
 
 function filterListingsForRun(listings: AuctionListing[], run: AuctionAgentRun | null) {
   if (!run) return []
-
-  const sourceCode = String(run.parameter_snapshot?.source_code ?? '')
-  const startedAt = new Date(run.started_at).getTime()
-  const finishedAt = run.finished_at ? new Date(run.finished_at).getTime() : Date.now()
-
-  return listings.filter((listing) => {
-    const listingTimestamp = new Date(listing.last_seen_at).getTime()
-    const isWithinRunWindow = listingTimestamp >= startedAt - 60_000 && listingTimestamp <= finishedAt + 60_000
-    const isMatchingSource = sourceCode === '' || sourceCode === 'licitor'
-    return isWithinRunWindow && isMatchingSource
-  })
+  return listings
 }
 
 export default function AuctionRunsPanel() {
   const { data: runs = [], isLoading, refetch, isFetching } = useAuctionAgentRuns()
   const launchRun = useLaunchLicitorAuctionRun()
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null)
-  const [audienceUrlsText, setAudienceUrlsText] = useState('')
 
   useEffect(() => {
     if (!runs.length) {
@@ -128,19 +131,8 @@ export default function AuctionRunsPanel() {
   const listingsForRun = filterListingsForRun(recentListings, selectedRun)
 
   const handleLaunch = async () => {
-    const audienceUrls = audienceUrlsText
-      .split('\n')
-      .map((value) => value.trim())
-      .filter(Boolean)
-
-    if (audienceUrls.length === 0) {
-      toast.error('Ajoute au moins une URL d\'audience Licitor')
-      return
-    }
-
     try {
-      const result = await launchRun.mutateAsync({ audience_urls: audienceUrls, auto_dispatch: true })
-      setAudienceUrlsText('')
+      const result = await launchRun.mutateAsync({ auto_dispatch: true })
       setSelectedRunId(result.run_id)
       toast.success(`Run #${result.run_id} lancé`)
       refetch()
@@ -168,23 +160,14 @@ export default function AuctionRunsPanel() {
           </button>
         </div>
 
-        <div className="p-3 border-b border-[#262626] space-y-2">
-          <label className="block text-[10px] text-[#525252] uppercase tracking-wide">
-            URLs audiences Licitor
-          </label>
-          <textarea
-            value={audienceUrlsText}
-            onChange={(event) => setAudienceUrlsText(event.target.value)}
-            placeholder="https://www.licitor.com/ventes-judiciaires-immobilieres/tj-paris/jeudi-19-mars-2026.html"
-            className="w-full min-h-[104px] rounded-md border border-[#262626] bg-[#0d0d0d] px-3 py-2 text-xs text-white font-mono resize-y focus:outline-none focus:border-[#404040]"
-          />
+        <div className="p-3 border-b border-[#262626]">
           <button
             onClick={handleLaunch}
             disabled={launchRun.isPending}
             className="w-full h-9 rounded-md bg-[#22c55e] text-black text-xs font-semibold hover:bg-[#16a34a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Play className="h-3.5 w-3.5" />
-            {launchRun.isPending ? 'Lancement...' : 'Creer et dispatcher'}
+            {launchRun.isPending ? 'Lancement...' : 'Lancer Licitor IDF'}
           </button>
         </div>
 
@@ -307,25 +290,35 @@ export default function AuctionRunsPanel() {
                       href={listing.source_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="block rounded-md border border-[#262626] bg-[#111111] p-3 hover:bg-[#151515] transition-colors"
+                      className="flex items-center gap-3 rounded-md border border-[#262626] bg-[#111111] px-3 py-2 hover:bg-[#151515] transition-colors"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm text-white">{listing.title}</p>
-                          <p className="mt-1 text-[11px] text-[#737373]">
-                            {listing.city ?? 'Ville inconnue'}
-                            {listing.postal_code ? ` • ${listing.postal_code}` : ''}
-                            {listing.surface_m2 ? ` • ${listing.surface_m2} m²` : ''}
-                          </p>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-[10px] border ${statusClasses(listing.status)}`}>
-                          {listing.status}
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white truncate">{listing.title}</p>
+                        <p className="text-[11px] text-[#525252] truncate">
+                          {[listing.city, listing.surface_m2 ? `${listing.surface_m2}m²` : null, formatCurrency(listing.reserve_price)].filter(Boolean).join(' · ')}
+                        </p>
+                        <p className="text-[10px] text-[#404040] truncate">
+                          {[
+                            listing.auction_date ? `enchères ${formatDateTime(listing.auction_date)}` : null,
+                            listing.visit_dates?.length ? `visite ${listing.visit_dates[0]}` : null,
+                          ].filter(Boolean).join(' · ')}
+                        </p>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[#a3a3a3]">
-                        <span>Mise à prix: {formatCurrency(listing.reserve_price)}</span>
-                        <span>Occupation: {listing.occupancy_status ?? 'n/a'}</span>
-                        <span>Vu le {formatDateTime(listing.last_seen_at)}</span>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {listing.rentabilite_brute != null && (
+                          <span className="text-[10px] font-mono text-[#a3a3a3]">{listing.rentabilite_brute.toFixed(1)}%</span>
+                        )}
+                        {listing.score_global != null && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${
+                            listing.score_global >= 70
+                              ? 'text-[#22c55e] border-[#22c55e]/30 bg-[#22c55e]/10'
+                              : listing.score_global >= 50
+                              ? 'text-[#eab308] border-[#eab308]/30 bg-[#eab308]/10'
+                              : 'text-[#ef4444] border-[#ef4444]/30 bg-[#ef4444]/10'
+                          }`}>
+                            {listing.score_global}
+                          </span>
+                        )}
                       </div>
                     </a>
                   ))
@@ -343,22 +336,18 @@ export default function AuctionRunsPanel() {
               </div>
             ) : (
               events.map((event) => (
-                <div key={event.id} className="rounded-md border border-[#262626] bg-[#171717] p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-mono text-[#525252]">
-                      {formatDateTime(event.created_at)}
-                    </span>
-                    <span className={`text-[10px] uppercase tracking-wide ${levelClasses(event.level)}`}>
-                      {event.level}
-                    </span>
-                    <span className="text-[10px] text-[#737373]">{event.step ?? 'run'}</span>
-                    <span className="ml-auto text-[10px] font-mono text-[#525252]">{event.event_type}</span>
-                  </div>
-                  <p className="mt-2 text-sm text-white">{event.message}</p>
+                <div key={event.id} className="flex items-baseline gap-2 px-2 py-1">
+                  <span className="text-[10px] font-mono text-[#404040] flex-shrink-0">
+                    {formatDateTime(event.created_at)}
+                  </span>
+                  <span className={`text-[10px] flex-shrink-0 ${levelClasses(event.level)}`}>
+                    {event.event_type}
+                  </span>
+                  <span className="text-[11px] text-[#737373] truncate">{event.message}</span>
                   {summarizePayload(event.payload) ? (
-                    <p className="mt-2 text-[11px] text-[#737373] break-all">
+                    <span className="text-[10px] font-mono text-[#525252] truncate ml-auto flex-shrink-0 max-w-[200px]">
                       {summarizePayload(event.payload)}
-                    </p>
+                    </span>
                   ) : null}
                 </div>
               ))

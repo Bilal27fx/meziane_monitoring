@@ -80,9 +80,27 @@ class LicitorAuctionAdapter:
 
         return listings
 
+    def discover_paginated_urls(self, html: str, base_url: str) -> list[str]:
+        """Retourne toutes les URLs paginées détectées depuis la première page."""
+        soup = BeautifulSoup(html, "html.parser")
+        page_links = soup.select('a[href*="?p="]')
+        page_numbers: set[int] = set()
+        for link in page_links:
+            href = link.get("href", "")
+            match = re.search(r"\?p=(\d+)", href)
+            if match:
+                page_numbers.add(int(match.group(1)))
+
+        if not page_numbers:
+            return []
+
+        base = re.sub(r"\?.*$", "", base_url)
+        return [f"{base}?p={n}" for n in sorted(page_numbers)]
+
     def parse_listing_detail(self, html: str, page_url: str, listing: RawListing) -> RawListingDetail:
         soup = BeautifulSoup(html, "html.parser")
         page_text = soup.get_text("\n", strip=True)
+        floor_info = self._extract_floor_info(page_text)
 
         facts = {
             "title": self._first_non_empty(
@@ -91,12 +109,24 @@ class LicitorAuctionAdapter:
             ),
             "reserve_price": self._extract_price(page_text) or listing.reserve_price,
             "surface_m2": self._extract_surface(page_text) or listing.surface_m2,
+            "nb_pieces": self._extract_room_count(page_text),
+            "nb_chambres": self._extract_bedroom_count(page_text),
+            "etage": floor_info["etage"],
+            "type_etage": floor_info["type_etage"],
+            "ascenseur": self._extract_amenity_presence(page_text, ["ascenseur"], ["sans ascenseur"]),
+            "balcon": self._extract_amenity_presence(page_text, ["balcon"], ["sans balcon"]),
+            "terrasse": self._extract_amenity_presence(page_text, ["terrasse"], ["sans terrasse"]),
+            "cave": self._extract_amenity_presence(page_text, ["cave"], ["sans cave"]),
+            "parking": self._extract_amenity_presence(page_text, ["parking", "stationnement"], ["sans parking", "sans stationnement"]),
+            "box": self._extract_amenity_presence(page_text, ["box", "garage"], ["sans box", "sans garage"]),
+            "jardin": self._extract_amenity_presence(page_text, ["jardin"], ["sans jardin"]),
             "postal_code": self._extract_postal_code(page_text) or listing.postal_code,
             "occupancy_status": self._extract_occupancy_status(page_text),
             "lawyer_phone": self._extract_phone(page_text),
             "documents": self._extract_documents(soup, page_url),
             "visit_dates": self._extract_visit_mentions(page_text),
             "address": self._extract_address(page_text),
+            "property_details": self._extract_property_details(page_text),
         }
         return RawListingDetail(listing=listing, facts=facts)
 
@@ -157,6 +187,29 @@ class LicitorAuctionAdapter:
             return None
         return float(match.group(1).replace(",", "."))
 
+    def _extract_room_count(self, text: str) -> int | None:
+        match = re.search(r"\b(\d+)\s*pi[eè]ces?\b", text, flags=re.IGNORECASE)
+        return int(match.group(1)) if match else None
+
+    def _extract_bedroom_count(self, text: str) -> int | None:
+        match = re.search(r"\b(\d+)\s*chambres?\b", text, flags=re.IGNORECASE)
+        return int(match.group(1)) if match else None
+
+    def _extract_floor_info(self, text: str) -> dict[str, int | str | None]:
+        lowered = text.lower()
+        if "rez-de-chauss" in lowered or "rdc" in lowered:
+            return {"etage": 0, "type_etage": "rez_de_chaussee"}
+
+        match = re.search(r"\b(\d+)(?:er|e|eme|ème)?\s+etage\b", text, flags=re.IGNORECASE)
+        if match:
+            type_etage = "dernier_etage" if "dernier etage" in lowered or "dernier étage" in lowered else "etage"
+            return {"etage": int(match.group(1)), "type_etage": type_etage}
+
+        if "dernier etage" in lowered or "dernier étage" in lowered:
+            return {"etage": None, "type_etage": "dernier_etage"}
+
+        return {"etage": None, "type_etage": None}
+
     def _extract_postal_code(self, text: str) -> str | None:
         match = re.search(r"\b(75\d{3}|92\d{3}|93\d{3}|94\d{3}|95\d{3}|91\d{3}|77\d{3}|78\d{3})\b", text)
         return match.group(1) if match else None
@@ -173,6 +226,21 @@ class LicitorAuctionAdapter:
             if "libre" in lowered:
                 return "libre"
             return "occupe"
+        return None
+
+    def _extract_amenity_presence(
+        self,
+        text: str,
+        positive_keywords: list[str],
+        negative_keywords: list[str] | None = None,
+    ) -> bool | None:
+        lowered = text.lower()
+        for negative_keyword in negative_keywords or []:
+            if negative_keyword in lowered:
+                return False
+        for positive_keyword in positive_keywords:
+            if positive_keyword in lowered:
+                return True
         return None
 
     def _extract_phone(self, text: str) -> str | None:
@@ -195,6 +263,69 @@ class LicitorAuctionAdapter:
         if address_match:
             return address_match.group(0).strip()
         return None
+
+    def _extract_property_details(self, text: str) -> dict[str, object]:
+        typology = self._extract_typology(text)
+        floor_info = self._extract_floor_info(text)
+        condition_signals = self._extract_keyword_signals(
+            text,
+            {
+                "a_renover": ["a renover", "à rénover", "renovation", "rénovation"],
+                "a_rafraichir": ["a rafraichir", "à rafraîchir", "rafraichissement", "rafraîchissement"],
+                "bon_etat": ["bon etat", "bon état"],
+                "refait_a_neuf": ["refait a neuf", "refait à neuf", "renove", "rénové"],
+            },
+        )
+        layout_signals = self._extract_keyword_signals(
+            text,
+            {
+                "lumineux": ["lumineux", "lumineuse"],
+                "traversant": ["traversant", "traversante"],
+                "calme": ["calme"],
+                "cuisine_ouverte": ["cuisine ouverte"],
+                "double_sejour": ["double sejour", "double séjour"],
+            },
+        )
+
+        amenities = {
+            "ascenseur": self._extract_amenity_presence(text, ["ascenseur"], ["sans ascenseur"]),
+            "balcon": self._extract_amenity_presence(text, ["balcon"], ["sans balcon"]),
+            "terrasse": self._extract_amenity_presence(text, ["terrasse"], ["sans terrasse"]),
+            "cave": self._extract_amenity_presence(text, ["cave"], ["sans cave"]),
+            "parking": self._extract_amenity_presence(text, ["parking", "stationnement"], ["sans parking", "sans stationnement"]),
+            "box": self._extract_amenity_presence(text, ["box", "garage"], ["sans box", "sans garage"]),
+            "jardin": self._extract_amenity_presence(text, ["jardin"], ["sans jardin"]),
+        }
+
+        details: dict[str, object] = {
+            "typology": typology,
+            "room_count": self._extract_room_count(text),
+            "bedroom_count": self._extract_bedroom_count(text),
+            "floor": floor_info,
+            "amenities": amenities,
+            "condition_signals": condition_signals,
+            "layout_signals": layout_signals,
+        }
+        return {key: value for key, value in details.items() if value not in (None, [], {})}
+
+    def _extract_typology(self, text: str) -> str | None:
+        lowered = text.lower()
+        for label in ["studio", "t1", "t2", "t3", "t4", "t5", "f1", "f2", "f3", "f4", "f5"]:
+            if label in lowered:
+                return label.upper()
+        if "appartement" in lowered:
+            return "APPARTEMENT"
+        if "maison" in lowered:
+            return "MAISON"
+        return None
+
+    def _extract_keyword_signals(self, text: str, mapping: dict[str, list[str]]) -> list[str]:
+        lowered = text.lower()
+        signals: list[str] = []
+        for signal, keywords in mapping.items():
+            if any(keyword in lowered for keyword in keywords):
+                signals.append(signal)
+        return signals
 
     def _text_of_first(self, soup: BeautifulSoup, selector: str) -> str | None:
         node = soup.select_one(selector)

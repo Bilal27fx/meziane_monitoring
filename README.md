@@ -1,17 +1,17 @@
 # Meziane Monitoring
 
-Plateforme de pilotage de patrimoine immobilier avec backend FastAPI, dashboard Next.js, jobs asynchrones et documentation d'architecture.
+Plateforme de pilotage de patrimoine immobilier avec backend FastAPI, frontend Next.js, jobs asynchrones et documentation d'architecture.
 
-## Vue rapide
+## Vue d'ensemble
 
-Le repo est organisé en trois blocs:
-- `backend/`: API, modèles, services métier, tâches Celery, stockage et auth.
-- `frontend/`: dashboard, espace agent, back-office admin.
-- `docs/`: architecture, suivi des RFC, historique, refactors livrés.
+Le repository est organisé en trois blocs principaux:
+- `backend/`: API, modèles, services métier, tâches asynchrones, stockage et authentification.
+- `frontend/`: dashboard, espace agent et back-office admin.
+- `docs/`: documentation active, historique des décisions et journal des refactors.
 
-## Démarrage
+## Démarrage local
 
-### 1. Infrastructure locale
+### 1. Infrastructure
 
 ```bash
 docker-compose up -d
@@ -22,7 +22,6 @@ Services exposés:
 - Redis: `localhost:6379`
 - MinIO API: `localhost:9000`
 - MinIO Console: `localhost:9001`
-- Worker Celery: service `worker`
 
 ### 2. Backend
 
@@ -37,7 +36,7 @@ uvicorn app.main:app --reload
 
 API:
 - base: `http://localhost:8000`
-- docs Swagger: `http://localhost:8000/docs`
+- Swagger: `http://localhost:8000/docs`
 
 ### 3. Frontend
 
@@ -47,7 +46,7 @@ npm install
 npm run dev
 ```
 
-App:
+Application:
 - web: `http://localhost:3000`
 
 ## Stack
@@ -69,30 +68,33 @@ App:
 - TanStack Query
 - Zustand
 
-### Infra et stockage
+### Infra et outillage
 - Docker Compose
 - PostgreSQL 15
 - Redis 7
 - MinIO
-- GitNexus pour l'analyse d'impact
+- GitNexus pour l'analyse du code et l'impact avant modification
 
 ## Documentation
 
-Commencer ici:
-- [CLAUDE.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/CLAUDE.md): règles de travail, GitNexus, conventions.
-- [docs/README.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/README.md): index documentaire complet.
+Point d'entrée recommandé:
+- `CLAUDE.md`: cadre de travail, règles GitNexus et conventions du projet.
+- `docs/README.md`: index documentaire et hiérarchie des documents.
 
-Docs principales:
-- [PROFIL_ET_OBJECTIFS.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/architecture/PROFIL_ET_OBJECTIFS.md)
-- [ARCHITECTURE_SYSTEME.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/architecture/ARCHITECTURE_SYSTEME.md)
-- [FRONTEND_ARCHITECTURE.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/architecture/FRONTEND_ARCHITECTURE.md)
-- [PLAN.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/PLAN.md)
-- [TRACKING.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/TRACKING.md)
+Documents actifs à lire en priorité:
+- `docs/architecture/PROFIL_ET_OBJECTIFS.md`
+- `docs/architecture/ARCHITECTURE_SYSTEME.md`
+- `docs/architecture/FRONTEND_ARCHITECTURE.md`
+- `docs/PLAN.md`
+- `docs/TRACKING.md`
+
+Standard documentaire:
+- `docs/DOCUMENTATION_STANDARDS.md`: conventions de structure, nommage et maintenance de la documentation.
 
 ## Structure
 
 ```text
-Meziane_Monitoring/
+meziane_monitoring/
 ├── backend/
 ├── frontend/
 ├── docs/
@@ -124,21 +126,14 @@ npm run build
 
 # GitNexus
 cat .gitnexus/meta.json
+npx gitnexus status
 npx gitnexus analyze
 ```
 
-## Sécurité et configuration
+## Règles de maintenance documentaire
 
-- Ne jamais commit de secrets.
-- Les variables d'environnement sensibles doivent rester hors du repo.
-- Vérifier les valeurs par défaut de `SECRET_KEY`, `DATABASE_URL` et des accès MinIO avant tout déploiement.
-
-## Etat du projet
-
-Le projet dispose déjà:
-- d'un backend structuré par domaines
-- d'un frontend avec dashboard, agent et admin
-- d'une couche documentaire riche
-- d'un historique de refactors et RFC dans `docs/refactors/`
-
-L'état détaillé des chantiers en cours et terminés est suivi dans [docs/TRACKING.md](/Users/bilalmeziane/Desktop/Meziane_Monitoring/docs/TRACKING.md).
+- Les docs d'entrée ne doivent jamais pointer vers des chemins absolus ou obsolètes.
+- `docs/architecture/` contient la documentation active et stable.
+- `docs/history/` contient des archives et ne constitue pas la source de vérité par défaut.
+- `docs/refactors/` trace les changements livrés et les RFC.
+- Toute évolution notable du comportement, de l'architecture ou du workflow doit mettre à jour la doc correspondante.

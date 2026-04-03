@@ -125,12 +125,37 @@ class AuctionListingResponse(BaseModel):
     postal_code: Optional[str] = None
     address: Optional[str] = None
     surface_m2: Optional[float] = None
+    nb_pieces: Optional[int] = None
+    nb_chambres: Optional[int] = None
+    etage: Optional[int] = None
+    type_etage: Optional[str] = None
+    ascenseur: Optional[bool] = None
+    balcon: Optional[bool] = None
+    terrasse: Optional[bool] = None
+    cave: Optional[bool] = None
+    parking: Optional[bool] = None
+    box: Optional[bool] = None
+    jardin: Optional[bool] = None
+    property_details: Optional[dict[str, Any]] = None
     occupancy_status: Optional[str] = None
+    visit_dates: Optional[list[str]] = None
+    auction_date: Optional[datetime] = None
     status: AuctionListingStatus
     published_at: Optional[datetime] = None
     last_seen_at: datetime
     created_at: datetime
     updated_at: datetime
+    # Scoring LLM
+    score_global: Optional[int] = None
+    score_localisation: Optional[int] = None
+    score_prix: Optional[int] = None
+    score_potentiel: Optional[int] = None
+    loyer_estime: Optional[float] = None
+    rentabilite_brute: Optional[float] = None
+    raison_score: Optional[str] = None
+    risques_llm: Optional[list[str]] = None
+    recommandation: Optional[str] = None
+    scored_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -180,7 +205,7 @@ class AgentRunCreate(BaseModel):
 
 
 class AuctionQuickLaunchRequest(BaseModel):
-    audience_urls: list[str] = Field(..., min_length=1)
+    audience_urls: list[str] = Field(default_factory=list)  # vide = lire depuis AgentParameterSet default
     auto_dispatch: bool = True
     agent_code: str = "licitor_ingestion"
     source_code: str = "licitor"

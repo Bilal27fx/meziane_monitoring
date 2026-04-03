@@ -149,6 +149,11 @@ def test_list_sessions_and_listings_with_filters(db_session):
                 city="Paris",
                 postal_code="75017",
                 surface_m2=103.70,
+                nb_pieces=4,
+                etage=3,
+                ascenseur=True,
+                balcon=True,
+                property_details={"typology": "T4"},
                 occupancy_status="a_verifier",
                 status=AuctionListingStatus.DISCOVERED,
             ),
@@ -185,6 +190,13 @@ def test_list_sessions_and_listings_with_filters(db_session):
             assert len(payload) == 1
             assert payload[0]["external_id"] == "107345"
             assert payload[0]["status"] == "shortlisted"
+            all_listings_response = client.get("/api/auction-data/listings", params={"session_id": session.id})
+            assert all_listings_response.status_code == 200
+            full_payload = all_listings_response.json()
+            enriched_listing = next(item for item in full_payload if item["external_id"] == "107344")
+            assert enriched_listing["nb_pieces"] == 4
+            assert enriched_listing["ascenseur"] is True
+            assert enriched_listing["property_details"]["typology"] == "T4"
     finally:
         app.dependency_overrides.clear()
 

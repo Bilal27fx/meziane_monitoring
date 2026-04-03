@@ -34,23 +34,52 @@ class AuctionFetchService:
 
         with httpx.Client(timeout=self.timeout_seconds, follow_redirects=True, headers=DEFAULT_HEADERS) as client:
             for session_url in session_urls:
-                session_response = client.get(session_url)
-                session_response.raise_for_status()
-                session_html = session_response.text
+                # Fetch page 1
+                first_response = client.get(session_url)
+                first_response.raise_for_status()
+                first_html = first_response.text
 
+                # Suivi itératif de la pagination (prev/next) via BFS
+                pages_html: dict[str, str] = {session_url: first_html}
+                queue = [session_url]
+
+                while queue:
+                    current_url = queue.pop(0)
+                    current_html = pages_html[current_url]
+                    if hasattr(self.adapter, "discover_paginated_urls"):
+                        for page_url in self.adapter.discover_paginated_urls(current_html, current_url):
+                            if page_url not in pages_html:
+                                page_response = client.get(page_url)
+                                page_response.raise_for_status()
+                                pages_html[page_url] = page_response.text
+                                queue.append(page_url)
+
+                # Collecte tous les listing URLs (dédupliqués) sur toutes les pages
+                seen_listing_urls: set[str] = set()
+                all_raw_listings = []
+                raw_sessions_first = self.adapter.parse_sessions(first_html, session_url)
+                raw_session = raw_sessions_first[0] if raw_sessions_first else None
+
+                if raw_session:
+                    for page_url, page_html in pages_html.items():
+                        raw_listings = self.adapter.parse_listing_cards(page_html, page_url, raw_session)
+                        for listing in raw_listings:
+                            if listing.source_url not in seen_listing_urls:
+                                seen_listing_urls.add(listing.source_url)
+                                all_raw_listings.append(listing)
+
+                # Fetch pages de détail pour chaque listing
                 detail_pages: dict[str, str] = {}
-                raw_sessions = self.adapter.parse_sessions(session_html, session_url)
-                if raw_sessions:
-                    raw_listings = self.adapter.parse_listing_cards(session_html, session_url, raw_sessions[0])
-                    for raw_listing in raw_listings:
-                        detail_response = client.get(raw_listing.source_url)
-                        detail_response.raise_for_status()
-                        detail_pages[raw_listing.source_url] = detail_response.text
+                for raw_listing in all_raw_listings:
+                    detail_response = client.get(raw_listing.source_url)
+                    detail_response.raise_for_status()
+                    detail_pages[raw_listing.source_url] = detail_response.text
 
                 session_pages.append(
                     {
                         "url": session_url,
-                        "html": session_html,
+                        "html": first_html,
+                        "pages_html": pages_html,
                         "detail_pages": detail_pages,
                     }
                 )

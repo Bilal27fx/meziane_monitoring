@@ -108,7 +108,7 @@ export function useAuctionListings(sourceCode: string | null) {
     queryKey: ['auction-listings', sourceCode],
     queryFn: async () => {
       const response = await api.get<AuctionListing[]>('/api/auction-data/listings', {
-        params: { limit: 20 },
+        params: { limit: 500 },
       })
       return response.data
     },

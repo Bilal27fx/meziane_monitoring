@@ -202,6 +202,32 @@ def dispatch_agent_run(run_id: int, db: Session = Depends(get_db)):
 
 @router.post("/launch/licitor", response_model=AuctionQuickLaunchResponse, status_code=status.HTTP_202_ACCEPTED)
 def quick_launch_licitor_run(body: AuctionQuickLaunchRequest, db: Session = Depends(get_db)):
+    # Résolution des URLs : body en priorité, sinon parameter set default
+    session_urls = list(body.audience_urls)
+    if not session_urls:
+        definition_check = db.query(AgentDefinition).filter(AgentDefinition.code == body.agent_code).first()
+        if definition_check:
+            default_ps = (
+                db.query(AgentParameterSet)
+                .filter(
+                    AgentParameterSet.agent_definition_id == definition_check.id,
+                    AgentParameterSet.is_default == True,  # noqa: E712
+                )
+                .first()
+            )
+            if default_ps:
+                session_urls = (default_ps.parameters_json or {}).get("session_urls", [])
+
+    if not session_urls:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Aucune URL d'audience fournie. "
+                "Passez audience_urls dans le body ou configurez un AgentParameterSet "
+                f"is_default=true pour l'agent '{body.agent_code}'."
+            ),
+        )
+
     source = db.query(AuctionSource).filter(AuctionSource.code == body.source_code).first()
     if source is None:
         source = AuctionSource(
@@ -232,7 +258,7 @@ def quick_launch_licitor_run(body: AuctionQuickLaunchRequest, db: Session = Depe
         status=AgentRunStatus.PENDING.value,
         parameter_snapshot={
             "source_code": body.source_code,
-            "session_urls": body.audience_urls,
+            "session_urls": session_urls,
         },
         started_at=datetime.utcnow(),
     )
@@ -246,7 +272,7 @@ def quick_launch_licitor_run(body: AuctionQuickLaunchRequest, db: Session = Depe
         "run_created",
         "Run Licitor cree depuis l'interface agent",
         step="run",
-        payload={"source_code": body.source_code, "audience_urls_count": len(body.audience_urls)},
+        payload={"source_code": body.source_code, "audience_urls_count": len(session_urls)},
     )
 
     task_name = None
@@ -270,3 +296,29 @@ def quick_launch_licitor_run(body: AuctionQuickLaunchRequest, db: Session = Depe
         dispatched=body.auto_dispatch,
         task_name=task_name,
     )
+
+
+@router.post("/listings/{listing_id}/score", status_code=status.HTTP_200_OK)
+def rescore_listing(listing_id: int, db: Session = Depends(get_db)):  # Relance le scoring LLM sur un listing
+    from app.models.auction_listing import AuctionListing
+    from app.services.auction_scoring_service import score_listing
+
+    listing = db.query(AuctionListing).filter(AuctionListing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail=f"Listing {listing_id} introuvable")
+
+    scored = score_listing(listing, db)
+    db.commit()
+
+    if not scored:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scoring indisponible (OPENAI_API_KEY absente ou erreur LLM)",
+        )
+
+    return {
+        "listing_id": listing_id,
+        "score_global": listing.score_global,
+        "recommandation": listing.recommandation,
+        "scored_at": listing.scored_at,
+    }
