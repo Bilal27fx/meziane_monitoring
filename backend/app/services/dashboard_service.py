@@ -70,11 +70,11 @@ class DashboardService:
         }
 
     def _calculate_patrimoine_net(self) -> float:
-        """Calcule patrimoine net total (somme valeur actuelle de tous les biens)"""
+        """Calcule patrimoine net total avec fallback prix acquisition si valeur actuelle absente"""
         result = self.db.query(
-            func.sum(Bien.valeur_actuelle)
+            func.sum(func.coalesce(Bien.valeur_actuelle, Bien.prix_acquisition))
         ).filter(
-            Bien.valeur_actuelle.isnot(None)
+            func.coalesce(Bien.valeur_actuelle, Bien.prix_acquisition).isnot(None)
         ).scalar()
 
         return float(result or 0)
@@ -84,14 +84,48 @@ class DashboardService:
         current_month = datetime.now().month
         current_year = datetime.now().year
 
-        result = self.db.query(
-            func.sum(Transaction.montant)
+        row = self.db.query(
+            func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label("revenus"),
+            func.sum(Transaction.montant).label("total"),
         ).filter(
             extract('year', Transaction.date) == current_year,
             extract('month', Transaction.date) == current_month
-        ).scalar()
+        ).one()
 
+        projected_revenus = self._get_projected_global_revenus_mensuels()
+        revenus = float(row.revenus or 0)
+        total = float(row.total or 0)
+
+        if revenus <= 0 and projected_revenus > 0:
+            return total + projected_revenus
+
+        return total
+
+    def _get_projected_global_revenus_mensuels(self) -> float:
+        """Revenus locatifs mensuels projetés depuis les baux actifs."""
+        result = self.db.query(
+            func.sum(Bail.loyer_mensuel + func.coalesce(Bail.charges_mensuelles, 0))
+        ).filter(
+            Bail.statut == StatutBail.ACTIF
+        ).scalar()
         return float(result or 0)
+
+    def _get_projected_revenus_mensuels_par_sci(self) -> Dict[int, float]:
+        """Revenus locatifs mensuels projetés par SCI depuis les baux actifs."""
+        rows = self.db.query(
+            Bien.sci_id,
+            func.sum(Bail.loyer_mensuel + func.coalesce(Bail.charges_mensuelles, 0)).label("revenus_mensuels"),
+        ).join(
+            Bien, Bail.bien_id == Bien.id
+        ).filter(
+            Bail.statut == StatutBail.ACTIF
+        ).group_by(Bien.sci_id).all()
+
+        return {
+            int(row.sci_id): float(row.revenus_mensuels or 0)
+            for row in rows
+            if row.sci_id is not None
+        }
 
     def _count_alertes(self) -> int:
         """Compte les alertes actives — 1 requête UNION au lieu de 2 (RFC-007)"""
@@ -141,14 +175,14 @@ class DashboardService:
         date_debut = today - timedelta(days=30)
 
         rows = self.db.query(
-            func.cast(Transaction.date, type_=func.date(Transaction.date).type).label("jour"),
+            Transaction.date.label("jour"),
             func.sum(case((Transaction.montant > 0, Transaction.montant), else_=0)).label("revenus"),
             func.sum(case((Transaction.montant < 0, func.abs(Transaction.montant)), else_=0)).label("depenses"),
             func.sum(Transaction.montant).label("net"),
         ).filter(
             Transaction.date >= date_debut,
             Transaction.date <= today,
-        ).group_by(func.cast(Transaction.date, type_=func.date(Transaction.date).type)).order_by("jour").all()
+        ).group_by(Transaction.date).order_by(Transaction.date).all()
 
         daily_data = {
             str(r.jour): {
@@ -213,8 +247,17 @@ class DashboardService:
     # === DERNIÈRES TRANSACTIONS ===
 
     def get_recent_transactions(self, limit: int = 10) -> List[Dict]:
-        """Récupère les N dernières transactions avec détails"""
-        transactions = self.db.query(Transaction).join(
+        """Récupère les N dernières transactions sans lazy-load des relations."""
+        rows = self.db.query(
+            Transaction.id,
+            Transaction.date,
+            Transaction.montant,
+            Transaction.libelle,
+            Transaction.categorie,
+            Transaction.statut_validation,
+            SCI.nom.label("sci_nom"),
+            Bien.adresse.label("bien_adresse"),
+        ).join(
             SCI, Transaction.sci_id == SCI.id
         ).outerjoin(
             Bien, Transaction.bien_id == Bien.id
@@ -223,20 +266,19 @@ class DashboardService:
             desc(Transaction.created_at)
         ).limit(limit).all()
 
-        result = []
-        for tx in transactions:
-            result.append({
-                "id": tx.id,
-                "date": tx.date.isoformat(),
-                "montant": float(tx.montant),
-                "libelle": tx.libelle,
-                "categorie": tx.categorie.value if tx.categorie else None,
-                "sci_nom": tx.sci.nom if tx.sci else None,
-                "bien_adresse": tx.bien.adresse if tx.bien else None,
-                "statut_validation": tx.statut_validation.value
-            })
-
-        return result
+        return [
+            {
+                "id": row.id,
+                "date": row.date.isoformat(),
+                "montant": float(row.montant),
+                "libelle": row.libelle,
+                "categorie": row.categorie.value if row.categorie else None,
+                "sci_nom": row.sci_nom,
+                "bien_adresse": row.bien_adresse,
+                "statut_validation": row.statut_validation.value,
+            }
+            for row in rows
+        ]
 
     # === TOP 5 BIENS PAR RENTABILITÉ ===
 
@@ -244,6 +286,7 @@ class DashboardService:
         """Top biens par rentabilité — tri et LIMIT côté SQL, pas en Python (RFC-007)"""
         from sqlalchemy import Float, cast, literal_column
         current_year = datetime.now().year
+        valeur_ref = func.coalesce(Bien.valeur_actuelle, Bien.prix_acquisition)
 
         # Cashflow annuel par bien
         cf_sub = self.db.query(
@@ -261,14 +304,14 @@ class DashboardService:
             Bien.adresse,
             Bien.ville,
             Bien.type_bien,
-            Bien.valeur_actuelle,
+            valeur_ref.label("valeur_reference"),
             cf_sub.c.revenus,
             cf_sub.c.cashflow_net,
-            (cf_sub.c.cashflow_net / Bien.valeur_actuelle * 100).label("rentabilite_nette"),
-            (cf_sub.c.revenus / Bien.valeur_actuelle * 100).label("rentabilite_brute"),
+            (cf_sub.c.cashflow_net / valeur_ref * 100).label("rentabilite_nette"),
+            (cf_sub.c.revenus / valeur_ref * 100).label("rentabilite_brute"),
         ).outerjoin(cf_sub, Bien.id == cf_sub.c.bien_id).filter(
-            Bien.valeur_actuelle.isnot(None),
-            Bien.valeur_actuelle > 0,
+            valeur_ref.isnot(None),
+            valeur_ref > 0,
         ).order_by(
             desc("rentabilite_nette")
         ).limit(limit).all()
@@ -279,7 +322,7 @@ class DashboardService:
                 "adresse": r.adresse,
                 "ville": r.ville,
                 "type_bien": r.type_bien.value,
-                "valeur_actuelle": float(r.valeur_actuelle),
+                "valeur_actuelle": float(r.valeur_reference),
                 "rentabilite_brute": round(float(r.rentabilite_brute or 0), 2),
                 "rentabilite_nette": round(float(r.rentabilite_nette or 0), 2),
                 "cashflow_annuel": float(r.cashflow_net or 0),
@@ -300,7 +343,7 @@ class DashboardService:
         bien_stats = self.db.query(
             Bien.sci_id,
             func.count(Bien.id).label('nb_biens'),
-            func.sum(Bien.valeur_actuelle).label('valeur_totale'),
+            func.sum(func.coalesce(Bien.valeur_actuelle, Bien.prix_acquisition)).label('valeur_totale'),
         ).group_by(Bien.sci_id).all()
         bien_map = {r.sci_id: r for r in bien_stats}
 
@@ -314,20 +357,30 @@ class DashboardService:
             extract('year', Transaction.date) == current_year,
         ).group_by(Transaction.sci_id).all()
         cf_map = {r.sci_id: r for r in cf_rows}
+        projected_revenus_map = self._get_projected_revenus_mensuels_par_sci()
 
         result = []
         for sci in sci_list:
             bs = bien_map.get(sci.id)
             cf = cf_map.get(sci.id)
+            projected_revenus_annuels = projected_revenus_map.get(sci.id, 0) * 12
+            revenus_annuels = float(cf.revenus or 0) if cf else 0
+            depenses_annuelles = abs(float(cf.depenses or 0)) if cf else 0
+            cashflow_annuel = float(cf.cashflow_net or 0) if cf else 0
+
+            if revenus_annuels <= 0 and projected_revenus_annuels > 0:
+                revenus_annuels = projected_revenus_annuels
+                cashflow_annuel = projected_revenus_annuels - depenses_annuelles
+
             result.append({
                 "id": sci.id,
                 "nom": sci.nom,
                 "siret": sci.siret,
                 "nb_biens": int(bs.nb_biens) if bs else 0,
                 "valeur_patrimoniale": float(bs.valeur_totale or 0) if bs else 0,
-                "cashflow_annuel": float(cf.cashflow_net or 0) if cf else 0,
-                "revenus_annuels": float(cf.revenus or 0) if cf else 0,
-                "depenses_annuelles": abs(float(cf.depenses or 0)) if cf else 0,
+                "cashflow_annuel": cashflow_annuel,
+                "revenus_annuels": revenus_annuels,
+                "depenses_annuelles": depenses_annuelles,
             })
         return result
 

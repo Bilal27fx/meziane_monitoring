@@ -13,12 +13,16 @@ Dépendances:
 Utilisé par:
 - tasks/banking_tasks.py
 - tasks/agent_tasks.py
+- tasks/auction_tasks.py
 - tasks/quittance_tasks.py
 """
 
 from celery import Celery
 from celery.schedules import crontab
 from app.config import settings
+from app.models import load_all_models
+
+load_all_models()
 
 celery_app = Celery(
     "meziane_monitoring",
@@ -27,6 +31,7 @@ celery_app = Celery(
     include=[
         "app.tasks.banking_tasks",
         "app.tasks.agent_tasks",
+        "app.tasks.auction_tasks",
         "app.tasks.quittance_tasks",
     ]
 )

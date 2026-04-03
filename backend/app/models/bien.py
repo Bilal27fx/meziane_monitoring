@@ -82,6 +82,7 @@ class Bien(Base):  # Représente bien immobilier détenu par SCI
     transactions = relationship("Transaction", back_populates="bien")
     baux = relationship("Bail", back_populates="bien", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="bien")
+    document_folders = relationship("DocumentFolder", back_populates="bien")
 
     def __repr__(self):
         return f"<Bien {self.type_bien.value} - {self.ville}>"

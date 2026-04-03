@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, TrendingUp, Users, DollarSign } from 'lucide-react'
+import { Bell, Building2, DollarSign, TrendingUp } from 'lucide-react'
 import KPICard from '@/components/dashboard/KPICard'
 import CashflowChart from '@/components/dashboard/CashflowChart'
 import PatrimoineChart from '@/components/dashboard/PatrimoineChart'
@@ -24,10 +24,10 @@ export default function DashboardPage() {
   const { data, isLoading } = useFullDashboard()
   const kpi = data?.kpi
 
-  const nbBiens = data?.sci_overview.reduce((sum, s) => sum + s.nb_biens, 0) ?? 0
-
   const cashflowChartData = data?.cashflow_30days?.map(d => ({ date: d.date, value: d.net }))
   const patrimoineChartData = data?.patrimoine_12months?.map(d => ({ date: d.date, value: d.valeur }))
+  const performanceYtd = kpi?.performance_ytd ?? 0
+  const alertesActives = kpi?.nb_alertes ?? 0
 
   return (
     <div className="min-h-[calc(100vh-56px)] p-4 overflow-y-auto">
@@ -40,6 +40,8 @@ export default function DashboardPage() {
           <KPICard
             title="Patrimoine net"
             value={isLoading ? '…' : formatKPI(kpi?.patrimoine_net ?? 0)}
+            change={isLoading ? undefined : performanceYtd}
+            trend={performanceYtd >= 0 ? 'up' : 'down'}
             icon={Building2}
           />
         </div>
@@ -52,17 +54,21 @@ export default function DashboardPage() {
         </div>
         <div className="col-span-3">
           <KPICard
-            title="Taux d'occupation"
-            value={isLoading ? '…' : `${kpi?.taux_occupation?.toFixed(1) ?? '—'}%`}
-            icon={TrendingUp}
+            title="Alertes actives"
+            value={isLoading ? '…' : String(alertesActives)}
+            trend={alertesActives > 0 ? 'down' : 'up'}
+            subtitle={data ? `${kpi?.nb_locataires_actifs ?? 0} locataires actifs` : undefined}
+            icon={Bell}
           />
         </div>
         <div className="col-span-3">
           <KPICard
-            title="Biens en portefeuille"
-            value={isLoading ? '…' : String(nbBiens || '—')}
-            icon={Users}
-            subtitle={data ? `${data.sci_overview.length} SCI · ${kpi?.nb_locataires_actifs ?? 0} locataires` : undefined}
+            title="Performance YTD"
+            value={isLoading ? '…' : `${performanceYtd > 0 ? '+' : ''}${performanceYtd.toFixed(1)}%`}
+            change={isLoading ? undefined : performanceYtd}
+            trend={performanceYtd >= 0 ? 'up' : 'down'}
+            subtitle={data ? `${data.sci_overview.length} SCI suivies` : undefined}
+            icon={TrendingUp}
           />
         </div>
 
@@ -90,10 +96,10 @@ export default function DashboardPage() {
           <SimulationForm />
         </div>
         <div className="col-span-4">
-          <OpportunitesWidget />
+          <OpportunitesWidget data={data?.opportunites} isLoading={isLoading} />
         </div>
         <div className="col-span-5">
-          <LocatairesCards />
+          <LocatairesCards data={data?.locataires} isLoading={isLoading} />
         </div>
       </div>
     </div>

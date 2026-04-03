@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Download, CheckCircle, XCircle, Pencil, X } from 'lucide-react'
+import { Plus, Download, CheckCircle, XCircle, Pencil, X, Trash2 } from 'lucide-react'
 import {
   useTransactions, useValidateTransaction, useRejectTransaction,
-  useCreateTransaction, useUpdateTransaction, useSCIs,
+  useCreateTransaction, useUpdateTransaction, useDeleteTransaction, useSCIs,
 } from '@/lib/hooks/useAdmin'
 import DataTable, { Column } from '@/components/ui/DataTable'
 import Badge from '@/components/ui/Badge'
@@ -36,6 +36,7 @@ export default function TransactionsTab() {
   const [statutFilter, setStatutFilter] = useState('')
 
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Transaction | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({ date: '', montant: '', libelle: '', categorie: '' })
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE)
@@ -51,6 +52,7 @@ export default function TransactionsTab() {
   const reject = useRejectTransaction()
   const createTx = useCreateTransaction()
   const updateTx = useUpdateTransaction()
+  const deleteTx = useDeleteTransaction()
 
   const transactions = data?.items ?? []
   const scis = scisData?.items ?? []
@@ -160,6 +162,12 @@ export default function TransactionsTab() {
         >
           <Pencil className="h-3 w-3" />
         </button>
+        <button
+          onClick={() => setConfirmDelete(t)}
+          className="w-6 h-6 flex items-center justify-center rounded text-[#525252] hover:text-[#ef4444] hover:bg-[#ef4444]/10 transition-colors" title="Supprimer"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
       </div>
     )},
   ]
@@ -255,6 +263,33 @@ export default function TransactionsTab() {
               <button onClick={() => setEditingTx(null)} className="flex-1 h-7 text-xs border border-[#262626] text-[#a3a3a3] rounded hover:bg-[#1a1a1a] transition-colors">Annuler</button>
               <button onClick={submitEdit} disabled={updateTx.isPending} className="flex-1 h-7 text-xs bg-white text-black rounded hover:bg-[#e5e5e5] transition-colors disabled:opacity-50">
                 {updateTx.isPending ? '…' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-[#111111] border border-[#262626] rounded-lg p-5 w-96 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-white uppercase tracking-wider">Supprimer transaction #{confirmDelete.id}</h3>
+              <button onClick={() => setConfirmDelete(null)} className="text-[#525252] hover:text-white"><X className="h-4 w-4" /></button>
+            </div>
+            <p className="text-sm text-[#a3a3a3]">
+              Supprimer <span className="text-white font-semibold">{confirmDelete.libelle}</span> ({formatCurrency(confirmDelete.montant)}) ?
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 h-7 text-xs border border-[#262626] text-[#a3a3a3] rounded hover:bg-[#1a1a1a] transition-colors">Annuler</button>
+              <button
+                onClick={() => deleteTx.mutate(confirmDelete.id, {
+                  onSuccess: () => { toast.success('Transaction supprimée'); setConfirmDelete(null) },
+                  onError: () => toast.error('Erreur lors de la suppression'),
+                })}
+                disabled={deleteTx.isPending}
+                className="flex-1 h-7 text-xs bg-[#ef4444] text-white rounded hover:bg-[#dc2626] transition-colors disabled:opacity-50"
+              >
+                {deleteTx.isPending ? '…' : 'Supprimer'}
               </button>
             </div>
           </div>

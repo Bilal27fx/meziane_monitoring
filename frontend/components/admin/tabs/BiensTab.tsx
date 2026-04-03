@@ -45,6 +45,20 @@ export default function BiensTab() {
     return 'text-[#ef4444]'
   }
 
+  const paiementVariant = (statut?: string) => {
+    if (statut === 'a_jour') return 'ok' as const
+    if (statut === 'retard') return 'warning' as const
+    if (statut === 'impaye') return 'error' as const
+    return 'default' as const
+  }
+
+  const paiementLabel = (bien: Bien) => {
+    if (bien.statut_paiement === 'a_jour') return 'À jour'
+    if (bien.statut_paiement === 'retard') return `Retard${bien.jours_retard ? ` J+${bien.jours_retard}` : ''}`
+    if (bien.statut_paiement === 'impaye') return 'Impayé'
+    return '—'
+  }
+
   const columns: Column<Bien>[] = [
     { header: 'Adresse', accessor: 'adresse', render: (b) => (
       <div>
@@ -63,6 +77,11 @@ export default function BiensTab() {
     )},
     { header: 'Loyer', accessor: 'loyer_mensuel', render: (b) => (
       <span className="font-mono text-xs text-white tabular-nums">{b.loyer_mensuel ? formatCurrency(b.loyer_mensuel) + '/m' : '—'}</span>
+    )},
+    { header: 'Paiement', accessor: 'statut_paiement', render: (b) => (
+      <Badge variant={paiementVariant(b.statut_paiement)} dot>
+        {paiementLabel(b)}
+      </Badge>
     )},
     { header: 'TRI Net', accessor: 'tri_net', render: (b) => (
       <span className={cn('font-mono text-xs tabular-nums font-semibold', triColor(b.tri_net))}>

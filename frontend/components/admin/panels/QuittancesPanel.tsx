@@ -1,7 +1,7 @@
 'use client'
 
-import { X, Download, FileText } from 'lucide-react'
-import { useQuittances, useGenerateQuittance } from '@/lib/hooks/useAdmin'
+import { X, Download, Check } from 'lucide-react'
+import { useQuittances, useMarkQuittancePaid } from '@/lib/hooks/useAdmin'
 import api from '@/lib/api/client'
 import Badge from '@/components/ui/Badge'
 import { formatCurrency } from '@/lib/utils/format'
@@ -13,6 +13,33 @@ interface Props {
   onClose: () => void
   locataireNom?: string
   locataireId: number | null
+}
+
+function extractFilenameFromDisposition(value?: string) {
+  if (!value) return null
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1])
+    } catch {
+      return utf8Match[1]
+    }
+  }
+  const simpleMatch = value.match(/filename="([^"]+)"/i) || value.match(/filename=([^;]+)/i)
+  return simpleMatch?.[1]?.trim() ?? null
+}
+
+function sanitizeFilenamePart(value?: string | null) {
+  const cleaned = (value ?? 'Locataire')
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, '-')
+    .trim()
+    .replace(/^-+|-+$/g, '')
+  return cleaned || 'Locataire'
+}
+
+function buildFallbackFilename(locataireNom: string | undefined, mois: string) {
+  return `${sanitizeFilenamePart(locataireNom)}-${sanitizeFilenamePart(mois)}.pdf`
 }
 
 function statutVariant(statut: Quittance['statut']): 'ok' | 'warning' | 'error' {
@@ -29,28 +56,39 @@ function statutLabel(statut: Quittance['statut']): string {
 
 export default function QuittancesPanel({ open, onClose, locataireNom, locataireId }: Props) {
   const { data: quittances = [], isLoading } = useQuittances(locataireId)
-  const generateQuittance = useGenerateQuittance()
+  const markQuittancePaid = useMarkQuittancePaid()
 
   if (!open) return null
 
   const handleDownload = async (quittanceId: number, mois: string) => {
     try {
       const response = await api.get(`/api/quittances/${quittanceId}/pdf`, { responseType: 'blob' })
-      const url = URL.createObjectURL(response.data as Blob)
-      window.open(url, '_blank')
+      const blob = response.data instanceof Blob
+        ? response.data
+        : new Blob([response.data], { type: response.headers['content-type'] ?? 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = extractFilenameFromDisposition(response.headers['content-disposition']) ?? buildFallbackFilename(locataireNom, mois)
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      window.setTimeout(() => {
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }, 1000)
       toast.success(`Quittance ${mois} téléchargée`)
     } catch {
       toast.error('Aucun PDF disponible pour cette quittance')
     }
   }
 
-  const handleGenerate = async () => {
-    if (!locataireId) return
+  const handleMarkPaid = async (quittanceId: number) => {
     try {
-      await generateQuittance.mutateAsync(locataireId)
-      toast.success('Quittance générée')
+      await markQuittancePaid.mutateAsync(quittanceId)
+      toast.success('Quittance marquée comme payée')
     } catch {
-      toast.error('Erreur lors de la génération')
+      toast.error('Erreur lors de la mise à jour')
     }
   }
 
@@ -60,7 +98,7 @@ export default function QuittancesPanel({ open, onClose, locataireNom, locataire
       <div className="fixed inset-0 z-30 bg-black/40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 bottom-0 z-40 w-96 bg-[#111111] border-l border-[#262626] flex flex-col">
+      <div className="fixed right-0 top-0 bottom-0 z-40 w-[28rem] bg-[#111111] border-l border-[#262626] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#262626]">
           <div>
@@ -89,7 +127,7 @@ export default function QuittancesPanel({ open, onClose, locataireNom, locataire
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#262626]">
-                  {['Mois', 'Montant', 'Statut', ''].map((h) => (
+                  {['Mois', 'Montant', 'Statut', 'Actions'].map((h) => (
                     <th key={h} className="px-3 py-2 text-left text-[9px] text-[#525252] uppercase tracking-wider">
                       {h}
                     </th>
@@ -115,32 +153,32 @@ export default function QuittancesPanel({ open, onClose, locataireNom, locataire
                         {statutLabel(q.statut)}
                       </Badge>
                     </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <button
-                        onClick={() => handleDownload(q.id, q.mois)}
-                        className="flex items-center gap-1 px-1.5 py-1 text-[9px] text-[#737373] hover:text-white hover:bg-[#262626] rounded transition-colors ml-auto"
-                      >
-                        <Download className="h-3 w-3" />
-                        PDF
-                      </button>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center justify-end gap-1 flex-wrap">
+                        {q.statut !== 'payee' && (
+                          <button
+                            onClick={() => handleMarkPaid(q.id)}
+                            disabled={markQuittancePaid.isPending}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-[#22c55e] border border-[#22c55e]/30 bg-[#22c55e]/10 hover:text-white hover:bg-[#14532d] rounded transition-colors disabled:opacity-50 whitespace-nowrap"
+                          >
+                            <Check className="h-3 w-3" />
+                            Marquer payée
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDownload(q.id, q.mois)}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[10px] text-[#737373] hover:text-white hover:bg-[#262626] rounded transition-colors whitespace-nowrap"
+                        >
+                          <Download className="h-3 w-3" />
+                          PDF
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-[#262626]">
-          <button
-            onClick={handleGenerate}
-            disabled={generateQuittance.isPending}
-            className="w-full h-8 flex items-center justify-center gap-1.5 bg-white text-black text-xs font-medium rounded hover:bg-[#e5e5e5] transition-colors disabled:opacity-50"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            {generateQuittance.isPending ? 'Génération…' : 'Générer quittance'}
-          </button>
         </div>
       </div>
     </>

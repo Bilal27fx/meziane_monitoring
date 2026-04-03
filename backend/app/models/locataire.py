@@ -39,6 +39,8 @@ class Locataire(Base):  # Représente locataire avec infos personnelles
     baux = relationship("Bail", back_populates="locataire", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="locataire")
     documents = relationship("Document", back_populates="locataire")
+    document_folders = relationship("DocumentFolder", back_populates="locataire")
+    paiements = relationship("LocatairePaiement", back_populates="locataire", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Locataire {self.prenom} {self.nom}>"

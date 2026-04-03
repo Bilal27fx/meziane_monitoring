@@ -6,6 +6,7 @@ Helpers pour upload documents sur MinIO et gestion bucket.
 """
 
 from io import BytesIO
+from urllib.parse import urlparse
 from minio import Minio
 from minio.error import S3Error
 from app.config import settings
@@ -46,3 +47,18 @@ def upload_bytes(
 
     scheme = "https" if settings.MINIO_SECURE else "http"
     return f"{scheme}://{settings.MINIO_ENDPOINT}/{bucket_name}/{object_name}"
+
+
+def delete_object_by_url(file_url: str) -> None:
+    parsed = urlparse(file_url)
+    object_path = parsed.path.lstrip("/")
+    bucket_name, _, object_name = object_path.partition("/")
+    if not bucket_name or not object_name:
+        raise ValueError("URL objet invalide")
+
+    client = get_minio_client()
+    try:
+        client.remove_object(bucket_name=bucket_name, object_name=object_name)
+    except S3Error as exc:
+        if exc.code not in {"NoSuchKey", "NoSuchObject", "NoSuchBucket"}:
+            raise

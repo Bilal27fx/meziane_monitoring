@@ -52,6 +52,7 @@ class Quittance(Base):  # Représente quittance loyer mensuelle
 
     # Relations
     bail = relationship("Bail", back_populates="quittances")
+    paiements = relationship("LocatairePaiement", back_populates="quittance")
 
     def __repr__(self):
         return f"<Quittance {self.annee}-{self.mois:02d} - {self.montant_total}€ - {self.statut.value}>"

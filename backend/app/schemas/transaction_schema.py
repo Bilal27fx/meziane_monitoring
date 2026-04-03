@@ -16,7 +16,7 @@ Utilisé par:
 
 from pydantic import BaseModel, Field, computed_field
 from typing import Optional, Dict, List
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 
 
@@ -71,7 +71,7 @@ class TransactionResponse(TransactionBase):  # Schema réponse API avec ID et m�
     statut_validation: StatutValidation
     valide_par: Optional[str] = None
     date_validation: Optional[date] = None
-    created_at: date
+    created_at: datetime
 
     @computed_field
     @property

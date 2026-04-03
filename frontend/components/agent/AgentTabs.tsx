@@ -1,20 +1,19 @@
 'use client'
 
+import { useState } from 'react'
 import * as Tabs from '@radix-ui/react-tabs'
-import ProspectionPanel from './ProspectionPanel'
-import TasksTable from './TasksTable'
-import LogsViewer from './LogsViewer'
+import AuctionRunsPanel from './AuctionRunsPanel'
 
 const TABS = [
-  { value: 'prospection', label: 'Prospection' },
-  { value: 'taches', label: 'Tâches' },
-  { value: 'logs', label: 'Logs' },
+  { value: 'encheres', label: 'Enchères' },
+  { value: 'legacy', label: 'Legacy' },
 ]
 
 export default function AgentTabs() {
+  const [activeTab, setActiveTab] = useState('encheres')
+
   return (
-    <Tabs.Root defaultValue="prospection" className="flex flex-col h-full">
-      {/* Tab triggers */}
+    <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
       <Tabs.List className="flex items-center gap-0 border-b border-[#262626] flex-shrink-0">
         {TABS.map(({ value, label }) => (
           <Tabs.Trigger
@@ -27,16 +26,20 @@ export default function AgentTabs() {
         ))}
       </Tabs.List>
 
-      {/* Tab content */}
       <div className="flex-1 min-h-0 overflow-hidden">
-        <Tabs.Content value="prospection" className="h-full p-3 overflow-hidden">
-          <ProspectionPanel />
+        <Tabs.Content value="encheres" className="h-full p-3 overflow-hidden">
+          {activeTab === 'encheres' ? <AuctionRunsPanel /> : null}
         </Tabs.Content>
-        <Tabs.Content value="taches" className="h-full p-3 overflow-y-auto">
-          <TasksTable />
-        </Tabs.Content>
-        <Tabs.Content value="logs" className="h-full p-3 overflow-hidden">
-          <LogsViewer />
+        <Tabs.Content value="legacy" className="h-full p-3 overflow-hidden">
+          <div className="h-full rounded-md border border-[#262626] bg-[#111111] p-6 flex items-center justify-center text-center">
+            <div>
+              <p className="text-sm text-white">Panneaux legacy désactivés</p>
+              <p className="mt-2 text-xs text-[#737373]">
+                Les anciens appels <code>/api/agent/*</code> ne sont pas branchés sur ce backend.
+                L’espace agent est recentré sur le domaine enchères pour éviter le bruit 404.
+              </p>
+            </div>
+          </div>
         </Tabs.Content>
       </div>
     </Tabs.Root>

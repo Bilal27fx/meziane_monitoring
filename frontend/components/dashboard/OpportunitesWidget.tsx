@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import { formatCurrency, formatPercentRaw } from '@/lib/utils/format'
-import { useDashboardOpportunites } from '@/lib/hooks/useDashboard'
 import type { OpportuniteOverview } from '@/lib/types'
+
+interface OpportunitesWidgetProps {
+  data?: OpportuniteOverview[]
+  isLoading?: boolean
+}
 
 function scoreStyle(score: number): { bg: string; text: string; border: string } {
   if (score >= 85) return { bg: 'bg-[#22c55e]/20', text: 'text-[#22c55e]', border: 'border-[#22c55e]/30' }
@@ -9,8 +13,8 @@ function scoreStyle(score: number): { bg: string; text: string; border: string }
   return { bg: 'bg-[#ef4444]/20', text: 'text-[#ef4444]', border: 'border-[#ef4444]/30' }
 }
 
-export default function OpportunitesWidget() {
-  const { data: opportunites = [], isLoading } = useDashboardOpportunites(2)
+export default function OpportunitesWidget({ data = [], isLoading = false }: OpportunitesWidgetProps) {
+  const opportunites = data.slice(0, 2)
 
   return (
     <div className="p-3.5 bg-[#111111] border border-[#262626] rounded-lg flex flex-col hover:border-[#404040] transition-colors">

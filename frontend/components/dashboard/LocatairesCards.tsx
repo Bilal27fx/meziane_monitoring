@@ -1,6 +1,10 @@
 import { formatCurrency } from '@/lib/utils/format'
-import { useDashboardLocataires } from '@/lib/hooks/useDashboard'
 import type { LocataireOverview } from '@/lib/types'
+
+interface LocatairesCardsProps {
+  data?: LocataireOverview[]
+  isLoading?: boolean
+}
 
 function mapStatut(statut: string): 'a_jour' | 'retard' | 'impaye' {
   if (statut === 'paye') return 'a_jour'
@@ -34,8 +38,8 @@ function StatusDot({ statut, nb_impayes }: { statut: string; nb_impayes: number 
   )
 }
 
-export default function LocatairesCards() {
-  const { data: locataires = [], isLoading } = useDashboardLocataires()
+export default function LocatairesCards({ data = [], isLoading = false }: LocatairesCardsProps) {
+  const locataires = data.slice(0, 4)
 
   return (
     <div className="p-3.5 bg-[#111111] border border-[#262626] rounded-lg flex flex-col hover:border-[#404040] transition-colors">

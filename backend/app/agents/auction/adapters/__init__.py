@@ -1,0 +1,3 @@
+"""
+adapters - Adapters sources auctions
+"""

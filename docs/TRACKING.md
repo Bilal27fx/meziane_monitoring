@@ -38,8 +38,9 @@
 **Dossier :** `refactors/RFC-001_fix-endpoints-validate-reject/`
 **Type :** bugfix
 **Priorité :** CRITIQUE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Le frontend appelle `/api/transactions/{id}/validate` et `/api/transactions/{id}/reject` (anglais).
@@ -58,8 +59,9 @@ Remplacer `validate` → `valider` et `reject` → `rejeter` dans `useAdmin.ts`.
 **Dossier :** `refactors/RFC-002_quittance-routes-backend/`
 **Type :** feature
 **Priorité :** HAUTE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Le frontend appelle `GET /api/locataires/{id}/quittances` mais aucune route n'existe en backend.
@@ -84,8 +86,9 @@ Enregistrer le router dans `main.py`.
 **Dossier :** `refactors/RFC-003_upload-documents-locataire/`
 **Type :** feature
 **Priorité :** MOYENNE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Dans `LocataireForm.tsx`, la zone drag-and-drop "Glisser-déposer les documents" est purement décorative.
@@ -108,8 +111,9 @@ Le backend a pourtant un endpoint complet : `POST /api/documents/upload-locatair
 **Dossier :** `refactors/RFC-004_quittances-panel-api/`
 **Type :** bugfix
 **Priorité :** MOYENNE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Dans `QuittancesPanel.tsx` :
@@ -131,8 +135,9 @@ Dans `QuittancesPanel.tsx` :
 **Dossier :** `refactors/RFC-005_mock-data-fallback/`
 **Type :** refactor
 **Priorité :** BASSE
-**Statut :** En attente
+**Statut :** Terminé
 **Ouvert le :** 2026-03-24
+**Clôturé le :** 2026-03-24
 
 **Problème :**
 Dans `useAdmin.ts`, tous les hooks de lecture ont un catch silencieux qui retourne des données mock sans notifier l'utilisateur :

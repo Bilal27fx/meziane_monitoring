@@ -1,58 +1,64 @@
-# Plan général — Meziane Monitoring
-**Mis à jour :** 2026-03-24
-**Branche active :** `update&optimisation`
-
----
+# Plan général - Meziane Monitoring
+**Mis à jour :** 2026-03-25
 
 ## Vue d'ensemble
 
-Le backend est production-ready (5 sprints terminés). Le frontend est construit mais plusieurs points de connexion avec l'API sont cassés ou non implémentés. Ce plan couvre les corrections à apporter pour avoir une application pleinement fonctionnelle.
+Le socle principal du projet est en place:
+- backend FastAPI structuré
+- frontend Next.js branché sur l'API
+- auth, dashboard, documents, quittances et jobs asynchrones déjà présents
 
----
+Le plan n'est plus centré sur les RFC 001 à 005: elles sont déjà terminées et tracées dans `TRACKING.md`.
 
-## Phase en cours — Corrections & Connexions API
+## Phase actuelle
 
-### Statut
-```
-RFC-001  Fix endpoints validate/reject        [ ] En attente
-RFC-002  Routes backend quittances            [ ] En attente
-RFC-003  Upload documents locataire           [ ] En attente
-RFC-004  Boutons QuittancesPanel → API        [ ] En attente
-RFC-005  Suppression mock data fallback       [ ] En attente
-```
+La phase active est désormais une phase de stabilisation continue:
+- amélioration de la qualité documentaire
+- alignement doc / code / architecture
+- durcissement progressif de l'auth, des flux critiques et de la maintenabilité
+- ouverture de nouvelles RFC au fil des besoins réels
 
-### Priorité d'exécution
+## Etat des travaux RFC connus
 
-| Ordre | RFC | Raison |
-|-------|-----|--------|
-| 1 | RFC-001 | CRITIQUE — 404 garanti sur valider/rejeter transaction |
-| 2 | RFC-002 | HAUTE — quittances inexistantes en backend |
-| 3 | RFC-003 | MOYENNE — upload docs UI non fonctionnel |
-| 4 | RFC-004 | MOYENNE — boutons quittances ne font rien |
-| 5 | RFC-005 | BASSE — erreurs API masquées silencieusement |
+RFC terminées à date:
+- RFC-001 - Fix endpoints validate/reject
+- RFC-002 - Routes backend quittances
+- RFC-003 - Upload documents locataire
+- RFC-004 - Boutons QuittancesPanel connectés API
+- RFC-005 - Suppression mock data fallback silencieux
+- RFC-006 - Suppression totale mock data + branchement API
+- RFC-007 - Scalabilité & Performance Backend
+- RFC-008 - Sécurité Auth + Performance suite
 
----
+Le détail et le journal des clôtures sont dans `TRACKING.md`.
 
-## Historique des phases terminées
+## Priorités permanentes
 
-| Phase | Description | Fichier |
-|-------|-------------|---------|
-| Backend Readiness (5 sprints) | Auth, performance, async, plugins, schemas | `history/PROGRESSION_BACKEND_READINESS.md` |
-| Frontend Build (5 phases) | Foundation, Dashboard, Agent, Admin, Polish | `history/PROGRESSION_FRONTEND.md` |
-| Plan initial backend | Analyse complète ~70 fichiers | `history/PLAN_BACKEND_READINESS.md` |
-| Plan UI CRUD | SCI / Biens / Locataires | `history/PLAN_UI_CRUD_SCI_BIEN_LOCATAIRE.md` |
+Tant qu'aucune nouvelle RFC n'est ouverte, les priorités structurantes restent:
+- garder la documentation à jour
+- préserver la cohérence entre frontend, backend et architecture
+- documenter chaque refactor important
+- analyser l'impact avant modification via GitNexus
 
----
+## Historique utile
+
+| Sujet | Fichier |
+|-------|---------|
+| Backend readiness | `history/PROGRESSION_BACKEND_READINESS.md` |
+| Construction frontend | `history/PROGRESSION_FRONTEND.md` |
+| Plan initial backend | `history/PLAN_BACKEND_READINESS.md` |
+| Plan UI CRUD | `history/PLAN_UI_CRUD_SCI_BIEN_LOCATAIRE.md` |
 
 ## Architecture
 
-- Système → `architecture/ARCHITECTURE_SYSTEME.md`
-- Frontend → `architecture/FRONTEND_ARCHITECTURE.md`
-- Dashboard layout → `architecture/DASHBOARD_LAYOUT_PLAN.md`
-- Profil & objectifs → `architecture/PROFIL_ET_OBJECTIFS.md`
-
----
+- Système: `architecture/ARCHITECTURE_SYSTEME.md`
+- Frontend: `architecture/FRONTEND_ARCHITECTURE.md`
+- Dashboard: `architecture/DASHBOARD_LAYOUT_PLAN.md`
+- Profil et objectifs: `architecture/PROFIL_ET_OBJECTIFS.md`
 
 ## Suivi des RFC
 
-Voir `TRACKING.md` pour l'état détaillé de chaque refactor.
+Voir `TRACKING.md` pour:
+- l'état détaillé des RFC
+- les clôtures
+- le résumé des changements déjà livrés

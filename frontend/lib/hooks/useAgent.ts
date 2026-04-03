@@ -2,7 +2,16 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api/client'
-import type { Opportunite, CeleryTask, OpportuniteParams, AgentConfig } from '@/lib/types'
+import type {
+  Opportunite,
+  CeleryTask,
+  OpportuniteParams,
+  AgentConfig,
+  AuctionAgentRun,
+  AuctionAgentRunEvent,
+  AuctionListing,
+  AuctionQuickLaunchPayload,
+} from '@/lib/types'
 
 export function useOpportunites(params?: OpportuniteParams) {
   return useQuery({
@@ -68,5 +77,58 @@ export function useSaveAgentConfig() {
   return useMutation({
     mutationFn: (config: AgentConfig) => api.put('/api/agent/config', config),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['agent-config'] }),
+  })
+}
+
+export function useAuctionAgentRuns() {
+  return useQuery({
+    queryKey: ['auction-agent-runs'],
+    queryFn: async () => {
+      const response = await api.get<AuctionAgentRun[]>('/api/auction-agents/runs')
+      return response.data
+    },
+    refetchInterval: 5_000,
+  })
+}
+
+export function useAuctionAgentRunEvents(runId: number | null) {
+  return useQuery({
+    queryKey: ['auction-agent-runs', runId, 'events'],
+    queryFn: async () => {
+      const response = await api.get<AuctionAgentRunEvent[]>(`/api/auction-agents/run/${runId}/events`)
+      return response.data
+    },
+    enabled: runId !== null,
+    refetchInterval: 5_000,
+  })
+}
+
+export function useAuctionListings(sourceCode: string | null) {
+  return useQuery({
+    queryKey: ['auction-listings', sourceCode],
+    queryFn: async () => {
+      const response = await api.get<AuctionListing[]>('/api/auction-data/listings', {
+        params: { limit: 20 },
+      })
+      return response.data
+    },
+    enabled: sourceCode !== null,
+    refetchInterval: 5_000,
+  })
+}
+
+export function useLaunchLicitorAuctionRun() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: AuctionQuickLaunchPayload) => {
+      const response = await api.post<{ run_id: number; dispatched: boolean; task_name?: string | null }>(
+        '/api/auction-agents/launch/licitor',
+        payload
+      )
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['auction-agent-runs'] })
+    },
   })
 }

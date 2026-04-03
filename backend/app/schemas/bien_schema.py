@@ -65,6 +65,8 @@ class BienResponse(BienBase):  # Schema réponse API avec ID
     sci_nom: Optional[str] = None
     loyer_mensuel: Optional[float] = None
     tri_net: Optional[float] = None
+    statut_paiement: Optional[str] = None
+    jours_retard: Optional[int] = None
 
     class Config:
         from_attributes = True

@@ -6,7 +6,7 @@ Schemas Pydantic pour creation et lecture de Locataires.
 Validation des donnees API.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 from datetime import date
 
@@ -18,6 +18,14 @@ class BailCreateData(BaseModel):  # Données bail à créer avec le locataire
     loyer_mensuel: float = Field(..., gt=0)
     charges_mensuelles: float = Field(default=0, ge=0)
     depot_garantie: Optional[float] = Field(None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_dates(self):
+        if self.date_fin and self.date_fin < self.date_debut:
+            raise ValueError("La date de fin du bail ne peut pas être antérieure à la date de début")
+        if self.date_fin and self.date_fin.year < 1900:
+            raise ValueError("La date de fin du bail est invalide")
+        return self
 
 
 class LocataireBase(BaseModel):

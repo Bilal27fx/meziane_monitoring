@@ -21,7 +21,7 @@ export default function TransactionsTable({ data = [] }: TransactionsTableProps)
     <div className="p-3.5 bg-[#111111] border border-[#262626] rounded-lg flex flex-col hover:border-[#404040] transition-colors">
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs text-[#a3a3a3] uppercase tracking-widest font-medium">Transactions récentes</span>
-        <Link href="/admin" className="text-xs text-[#737373] hover:text-white transition-colors font-medium">
+        <Link href="/admin?tab=transactions" className="text-xs text-[#737373] hover:text-white transition-colors font-medium">
           Voir toutes →
         </Link>
       </div>

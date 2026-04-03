@@ -15,7 +15,7 @@ Utilisé par:
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, extract, func
+from sqlalchemy import and_, or_, extract, func, desc
 from typing import List, Optional
 from datetime import date, datetime
 from app.models.transaction import Transaction, TransactionCategorie, StatutValidation
@@ -55,7 +55,11 @@ class TransactionService:  # Service gestion transactions bancaires
         if statut_validation:
             query = query.filter(Transaction.statut_validation == statut_validation)
 
-        return query.order_by(Transaction.date.desc()).limit(limit).offset(offset).all()
+        return query.order_by(
+            desc(Transaction.date),
+            desc(Transaction.created_at),
+            desc(Transaction.id),
+        ).limit(limit).offset(offset).all()
 
     def count_all_transactions(
         self,

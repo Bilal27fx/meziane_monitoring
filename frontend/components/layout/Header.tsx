@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import StatusBadge from '@/components/layout/StatusBadge'
+import { useSystemHealth } from '@/lib/hooks/useSystemHealth'
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -19,6 +21,7 @@ function getPageTitle(pathname: string): string {
 export default function Header() {
   const pathname = usePathname()
   const [clock, setClock] = useState('')
+  const { data, isLoading, isError } = useSystemHealth()
 
   useEffect(() => {
     const update = () => {
@@ -32,9 +35,16 @@ export default function Header() {
     return () => clearInterval(id)
   }, [])
 
+  const apiStatus = isError ? 'offline' : isLoading ? 'unknown' : data?.api === 'online' ? 'online' : 'offline'
+  const celeryStatus = isError ? 'unknown' : isLoading ? 'unknown' : data?.celery === 'online' ? 'online' : 'offline'
+
   return (
     <header className="fixed top-0 left-12 right-0 z-10 h-14 bg-[#0d0d0d] border-b border-[#262626] flex items-center justify-between px-4">
       <span className="text-sm font-medium text-white">{getPageTitle(pathname)}</span>
+      <div className="flex items-center gap-4">
+        <StatusBadge status={apiStatus} label="API" />
+        <StatusBadge status={celeryStatus} label="Celery" />
+      </div>
       <span className="font-mono text-xs text-[#525252] tabular-nums">{clock}</span>
     </header>
   )
