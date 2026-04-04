@@ -114,6 +114,7 @@ export default function AuctionRunsPanel() {
     () => filteredListings.filter((listing) => listing.status === 'shortlisted').length,
     [filteredListings]
   )
+  const hiddenListingsCount = listings.length - filteredListings.length
 
   const handleLaunch = async () => {
     try {
@@ -162,6 +163,10 @@ export default function AuctionRunsPanel() {
             <p className="mt-1 text-base font-semibold text-white">{filteredListings.length}</p>
           </div>
           <div className="bg-[#111111] px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-wide text-[#525252]">Annonces récupérées</p>
+            <p className="mt-1 text-base font-semibold text-white">{listings.length}</p>
+          </div>
+          <div className="bg-[#111111] px-3 py-2.5">
             <p className="text-[10px] uppercase tracking-wide text-[#525252]">Shortlist</p>
             <p className="mt-1 text-base font-semibold text-white">{shortlistCount}</p>
           </div>
@@ -186,10 +191,12 @@ export default function AuctionRunsPanel() {
         <div className="flex items-center justify-between gap-4 border-b border-[#262626] px-3 py-2.5">
           <div>
             <h3 className="text-xs font-semibold text-white">Catalogue</h3>
-            <p className="mt-1 text-[10px] uppercase tracking-wide text-[#525252]">Lecture rapide</p>
+            <p className="mt-1 text-[10px] uppercase tracking-wide text-[#525252]">
+              Lecture rapide · filtre actif sur prioritaire et opportunité rare
+            </p>
           </div>
           <div className="text-[11px] font-mono text-[#737373]">
-            {filteredListings.length} résultat{filteredListings.length > 1 ? 's' : ''}
+            {filteredListings.length} / {listings.length} résultat{listings.length > 1 ? 's' : ''}
           </div>
         </div>
 
@@ -208,6 +215,12 @@ export default function AuctionRunsPanel() {
             </div>
           ) : (
             <div className="space-y-1.5">
+              {hiddenListingsCount > 0 ? (
+                <div className="rounded-lg border border-[#3f3f46] bg-[#161616] px-3 py-2 text-[11px] text-[#a3a3a3]">
+                  {listings.length} annonces récupérées par l&apos;API, {filteredListings.length} affichées.
+                  Les {hiddenListingsCount} autres sont masquées car hors catégories `prioritaire` / `opportunite_rare`.
+                </div>
+              ) : null}
               <div className="hidden rounded-lg border border-[#262626] bg-[#141414] px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-[#6b7280] lg:grid lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_minmax(0,1.3fr)_auto] lg:items-center lg:gap-3">
                 <span>Bien</span>
                 <span>Enchères</span>

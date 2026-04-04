@@ -1,0 +1,233 @@
+{
+  "llm": {
+    "model": "gpt-5.4-mini",
+    "temperature": 0.1,
+    "timeout": 20,
+    "system_prompt": "Tu es un agent immobilier professionnel expert des ventes judiciaires en France. Tu reperes les opportunites en or avant la concurrence, mais tu restes factuel, discipline et prudent sur les risques. Tu ne produis jamais de score global libre. Tu reponds uniquement en JSON valide, sans texte additionnel.",
+    "user_prompt_template": "Tu travailles comme agent immobilier professionnel specialise en ventes judiciaires immobilieres en France.\nTa mission est de detecter avant tout le monde les vraies opportunites en or, tout en restant lucide sur les pieges classiques des encheres.\n\nTu ne joues pas un role generique de conseiller immobilier.\nTu raisonnes comme un professionnel du marche qui:\n- cherche des biens sous-valorises avant la concurrence\n- privilegie la liquidite, la revente et le potentiel locatif reel\n- valorise fortement les petites surfaces a Paris et les micro-localisations tendues\n- penalise severement les biens complexes, peu liquides, occupes ou juridiquement flous\n- reste discipline: pas d'enthousiasme artificiel, pas d'invention, pas de score global libre\n\nLe score global final est calcule par le systeme.\nTu fournis uniquement des signaux qualitatifs bornes qui ameliorent la precision du scoring deterministe.\n\n**Annonce :**\n- Titre : {title}\n- Type : {listing_type}\n- Ville : {city} ({postal_code})\n- Adresse : {address}\n- Surface : {surface}\n- Pieces : {nb_pieces}\n- Chambres : {nb_chambres}\n- Etage : {floor}\n- Composants : {components}\n- Mise a prix : {reserve_price}\n- Prix/m2 : {price_m2}\n- Occupation : {occupancy}\n- Audience : {auction_date}\n- Lieu audience : {auction_location}\n- Premiere visite : {visit_date}\n- Details structures : {property_details}\n- URL : {source_url}\n\n**Contexte metier :**\n- Il s'agit d'un agent qui doit faire remonter rapidement les meilleures ventes judiciaires avant qu'elles soient travaillees par d'autres investisseurs.\n- On veut capter les opportunites les plus actionnables, pas faire une expertise notariale complete.\n- Une annonce peut sembler bon marche mais etre mediocre si la sortie est lente, l'occupation mauvaise ou le quartier peu liquide.\n- Inversement, un petit bien tres liquide dans une bonne zone peut meriter un bonus fort meme si le texte source est imparfait.\n\n**Contexte d'investissement :**\n- Loyer de reference estime pour cette zone : {loyer_ref}EUR/mois\n- Decote occupation : {occupation_discount_hint}\n- Frais judiciaires a prevoir : ~{frais_adjudication_percent}% du prix d'adjudication\n- Strategie cible : {strategy_target}\n- Coeur de cible absolu : {absolute_target}\n- Categorie actuelle calculee par le systeme : {current_category}\n\n**Contraintes de reponse**\n- `micro_localisation_bonus` doit etre un entier entre -10 et 10\n- `qualite_bien_bonus` doit etre un entier entre -10 et 10\n- `travaux_estimes` doit rester prudent et realiste\n- Ne pas recalculer de score global\n- N'invente pas de donnees absentes\n- Si l'information est insuffisante, reste modere plutot que speculatif\n- Les bonus doivent etre rares et merites\n- Les malus doivent etre francs si la liquidite ou la sortie semblent mauvaises\n\n**Ta mission :**\n1. Estime un bonus/malus de micro-localisation en te demandant si un investisseur reactif voudrait vraiment se positionner vite\n2. Estime un bonus/malus de qualite intrinseque du bien pour la location et la revente\n3. Estime les travaux seulement s'il existe de vrais signaux de defaut ou d'obsolescence\n4. Redige une synthese courte orientee decision, comme pour un investisseur professionnel\n5. Liste les risques principaux qui peuvent detruire la valeur ou la vitesse de sortie\n\n**Reperes d'analyse**\n- Bonus micro-localisation: zone tres recherchee, excellente desserte, quartier liquide, adresse credible pour petite surface\n- Malus micro-localisation: marche lent, desserte faible, commune peu demandee, revente ou relocation difficiles\n- Bonus qualite: plan efficace, etage correct, ascenseur si etage eleve, balcon/terrasse, cave, bon etat, luminosite\n- Malus qualite: RDC penalise, gros travaux, distribution faible, bien atypique, nuisances probables\n- Travaux: reste credible et conservateur, ne gonfle pas sans signal texte reel\n\nReponds UNIQUEMENT en JSON valide :\n{\n    \"micro_localisation_bonus\": <int -10..10>,\n    \"qualite_bien_bonus\": <int -10..10>,\n    \"travaux_estimes\": <float>,\n    \"raison_score\": \"<explication 2-3 phrases>\",\n    \"risques\": [\"<risque1>\", \"<risque2>\"]\n}"
+  },
+  "market": {
+    "loyers_idf": {
+      "75": 30.0,
+      "92": 24.0,
+      "93": 18.0,
+      "94": 20.0,
+      "91": 17.0,
+      "95": 16.0,
+      "77": 15.0,
+      "78": 17.0
+    },
+    "loyer_defaut": 15.0,
+    "reference_price_m2": {
+      "75": 11000.0,
+      "92": 7600.0,
+      "93": 4200.0,
+      "94": 5200.0,
+      "91": 3400.0,
+      "95": 3100.0,
+      "77": 2900.0,
+      "78": 4300.0
+    },
+    "reference_price_m2_default": 2500.0,
+    "frais_adjudication_ratio": 0.1,
+    "premium_near_paris": [
+      "boulogne-billancourt",
+      "neuilly-sur-seine",
+      "levallois-perret",
+      "vincennes",
+      "issy-les-moulineaux",
+      "montrouge",
+      "saint-mande",
+      "clichy"
+    ],
+    "occupancy_discount_coefficients": {
+      "occupe": 0.78,
+      "default": 1.0
+    }
+  },
+  "scoring": {
+    "category_thresholds": {
+      "opportunite_rare": 85,
+      "prioritaire": 70,
+      "a_etudier": 55
+    },
+    "strategy_target": "prioriser petits biens a Paris, surtout 9 a 35m2",
+    "absolute_target": "18 a 25m2",
+    "occupation_discount_hint": "-15% a -30% si bien occupe",
+    "location_bases": {
+      "paris": 100,
+      "premium_near_paris": 82,
+      "idf_core": 64,
+      "idf_outer": 42,
+      "other": 28
+    },
+    "typology_scores": {
+      "target": 100,
+      "medium": 60,
+      "large": 20,
+      "small_surface_fallback": 85,
+      "default": 40
+    },
+    "surface_scores": [
+      {
+        "max": 0,
+        "score": 20
+      },
+      {
+        "max": 8.99,
+        "score": 10
+      },
+      {
+        "max": 18,
+        "score": 90
+      },
+      {
+        "max": 25,
+        "score": 100
+      },
+      {
+        "max": 35,
+        "score": 86
+      },
+      {
+        "max": 45,
+        "score": 60
+      }
+    ],
+    "travaux_rules": {
+      "a_renover": {
+        "minimum": 12000.0,
+        "ratio": 0.08
+      },
+      "a_rafraichir": {
+        "minimum": 6000.0,
+        "ratio": 0.04
+      },
+      "bon_etat": {
+        "ratio": 0.01
+      },
+      "default": {
+        "minimum_if_priced": 2500.0,
+        "ratio": 0.02
+      }
+    },
+    "price_ratio_scores": [
+      {
+        "max": 0.7,
+        "score": 100
+      },
+      {
+        "max": 0.78,
+        "score": 88
+      },
+      {
+        "max": 0.85,
+        "score": 67
+      },
+      {
+        "max": 0.92,
+        "score": 40
+      }
+    ],
+    "relative_m2_scores": [
+      {
+        "max": 0.7,
+        "score": 100
+      },
+      {
+        "max": 0.82,
+        "score": 85
+      },
+      {
+        "max": 0.95,
+        "score": 62
+      }
+    ],
+    "liquidity": {
+      "tension_transport": {
+        "paris": {
+          "tension": 98,
+          "transport": 95
+        },
+        "premium_near_paris": {
+          "tension": 84,
+          "transport": 88
+        },
+        "idf_core": {
+          "tension": 70,
+          "transport": 74
+        },
+        "other": {
+          "tension": 48,
+          "transport": 46
+        }
+      },
+      "resale_weights": {
+        "typology": 0.45,
+        "surface": 0.35,
+        "location": 0.2
+      },
+      "global_weights": {
+        "tension": 8,
+        "resale": 6,
+        "transport": 6
+      }
+    },
+    "occupation_scores": {
+      "libre": {
+        "free_score": 100,
+        "risk_score": 95
+      },
+      "occupe": {
+        "free_score": 30,
+        "risk_score": 25
+      },
+      "default": {
+        "free_score": 45,
+        "risk_score": 45
+      }
+    },
+    "quality": {
+      "base": 55,
+      "positive_step": 9,
+      "negative_step": 12,
+      "renovation_penalty": 2,
+      "refresh_penalty": 1,
+      "rdc_penalty": 1
+    },
+    "strategic_bonus_rules": [
+      {
+        "location": "paris",
+        "target_typologies": ["STUDIO", "T1", "F1", "T2", "F2"],
+        "surface_min": 18,
+        "surface_max": 25,
+        "bonus": 10
+      },
+      {
+        "location": "paris",
+        "target_typologies": ["STUDIO", "T1", "F1", "T2", "F2"],
+        "surface_min": 9,
+        "surface_max": 35,
+        "bonus": 7
+      },
+      {
+        "location": "premium_near_paris",
+        "target_typologies": ["STUDIO", "T1", "F1", "T2", "F2"],
+        "surface_min": 9,
+        "surface_max": 35,
+        "bonus": 4
+      }
+    ],
+    "score_weights": {
+      "cible": 0.35,
+      "prix": 0.25,
+      "liquidite": 0.2,
+      "occupation": 0.15,
+      "qualite": 0.05
+    },
+    "prix_max_coefficients": {
+      "cible": 0.78,
+      "agressif": 0.7
+    }
+  }
+}

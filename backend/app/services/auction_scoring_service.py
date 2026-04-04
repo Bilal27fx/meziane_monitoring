@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from functools import lru_cache
 import json
+from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import BaseModel, ValidationError
@@ -21,42 +23,7 @@ from app.models.auction_listing import AuctionListing
 
 logger = logging.getLogger(__name__)
 
-# Loyers moyens Île-de-France par tranche de code postal (€/m²/mois)
-_LOYERS_IDF = {
-    "75": 30.0,   # Paris intra-muros
-    "92": 24.0,   # Hauts-de-Seine
-    "93": 18.0,   # Seine-Saint-Denis
-    "94": 20.0,   # Val-de-Marne
-    "91": 17.0,   # Essonne
-    "95": 16.0,   # Val-d'Oise
-    "77": 15.0,   # Seine-et-Marne
-    "78": 17.0,   # Yvelines
-}
-
-_LOYER_DEFAUT = 15.0  # €/m²/mois hors IDF
-_FRAIS_ADJUDICATION_RATIO = 0.10
-
-_REFERENCE_PRICE_M2 = {
-    "75": 11000.0,
-    "92": 7600.0,
-    "93": 4200.0,
-    "94": 5200.0,
-    "91": 3400.0,
-    "95": 3100.0,
-    "77": 2900.0,
-    "78": 4300.0,
-}
-
-_PREMIUM_NEAR_PARIS = {
-    "boulogne-billancourt",
-    "neuilly-sur-seine",
-    "levallois-perret",
-    "vincennes",
-    "issy-les-moulineaux",
-    "montrouge",
-    "saint-mande",
-    "clichy",
-}
+_SCORING_CONFIG_PATH = Path(__file__).with_name("auction_scoring_config.json")
 
 
 class AuctionQualitativeSignals(BaseModel):
@@ -94,15 +61,46 @@ class AuctionLLMUnavailableError(RuntimeError):
     pass
 
 
+@lru_cache(maxsize=1)
+def _scoring_config() -> dict[str, Any]:
+    with _SCORING_CONFIG_PATH.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _market_config() -> dict[str, Any]:
+    return _scoring_config()["market"]
+
+
+def _llm_config() -> dict[str, Any]:
+    return _scoring_config()["llm"]
+
+
+def _scoring_rules() -> dict[str, Any]:
+    return _scoring_config()["scoring"]
+
+
+def _range_score(value: float | None, rules: list[dict[str, Any]], default_score: int) -> int:
+    if value is None:
+        return default_score
+    for rule in rules:
+        if value <= float(rule["max"]):
+            return int(rule["score"])
+    return default_score
+
+
 def _loyer_reference(postal_code: Optional[str], surface_m2: Optional[float]) -> float:
     if not surface_m2 or surface_m2 <= 0:
         return 0.0
     prefix = (postal_code or "")[:2]
-    taux = _LOYERS_IDF.get(prefix, _LOYER_DEFAUT)
+    market = _market_config()
+    taux = float(market["loyers_idf"].get(prefix, market["loyer_defaut"]))
     return round(taux * surface_m2, 2)
 
 
 def _build_prompt(listing: AuctionListing) -> str:
+    llm = _llm_config()
+    scoring = _scoring_rules()
+    market = _market_config()
     loyer_ref = _loyer_reference(listing.postal_code, listing.surface_m2)
     occupation = listing.occupancy_status or "inconnu"
     surface = f"{listing.surface_m2}m²" if listing.surface_m2 else "inconnue"
@@ -130,86 +128,32 @@ def _build_prompt(listing: AuctionListing) -> str:
     lieu_audience = listing.auction_location or listing.auction_tribunal or "inconnu"
     visite = (listing.visit_dates or ["inconnue"])[0]
     categorie_actuelle = listing.categorie_investissement or "non calculée"
-
-    return f"""Tu travailles comme agent immobilier professionnel spécialisé en ventes judiciaires immobilières en France.
-Ta mission est de détecter avant tout le monde les vraies opportunités en or, tout en restant lucide sur les pièges classiques des enchères.
-
-Tu ne joues pas un rôle générique de conseiller immobilier.
-Tu raisonnes comme un professionnel du marché qui:
-- cherche des biens sous-valorisés avant la concurrence
-- privilégie la liquidité, la revente et le potentiel locatif réel
-- valorise fortement les petites surfaces à Paris et les micro-localisations tendues
-- pénalise sévèrement les biens complexes, peu liquides, occupés ou juridiquement flous
-- reste discipliné: pas d'enthousiasme artificiel, pas d'invention, pas de score global libre
-
-Le score global final est calculé par le système.
-Tu fournis uniquement des signaux qualitatifs bornés qui améliorent la précision du scoring déterministe.
-
-**Annonce :**
-- Titre : {listing.title}
-- Type : {listing.listing_type or 'inconnu'}
-- Ville : {listing.city or 'inconnue'} ({listing.postal_code or '?'})
-- Adresse : {listing.address or 'inconnue'}
-- Surface : {surface}
-- Pièces : {listing.nb_pieces or 'inconnues'}
-- Chambres : {listing.nb_chambres or 'inconnues'}
-- Etage : {listing.type_etage or listing.etage or 'inconnu'}
-- Composants : {composants}
-- Mise à prix : {prix}
-- Prix/m² : {prix_m2}
-- Occupation : {occupation}
-- Audience : {audience}
-- Lieu audience : {lieu_audience}
-- Première visite : {visite}
-- Détails structurés : {details}
-- URL : {listing.source_url}
-
-**Contexte métier :**
-- Il s'agit d'un agent qui doit faire remonter rapidement les meilleures ventes judiciaires avant qu'elles soient travaillées par d'autres investisseurs.
-- On veut capter les opportunités les plus actionnables, pas faire une expertise notariale complète.
-- Une annonce peut sembler bon marché mais être médiocre si la sortie est lente, l'occupation mauvaise ou le quartier peu liquide.
-- Inversement, un petit bien très liquide dans une bonne zone peut mériter un bonus fort même si le texte source est imparfait.
-
-**Contexte d'investissement :**
-- Loyer de référence estimé pour cette zone : {loyer_ref}€/mois
-- Décote occupation : -15% à -30% si bien occupé
-- Frais judiciaires à prévoir : ~10% du prix d'adjudication
-- Stratégie cible : prioriser petits biens à Paris, surtout 9 à 35m²
-- Cœur de cible absolu : 18 à 25m²
-- Catégorie actuelle calculée par le système : {categorie_actuelle}
-
-**Contraintes de réponse**
-- `micro_localisation_bonus` doit être un entier entre -10 et 10
-- `qualite_bien_bonus` doit être un entier entre -10 et 10
-- `travaux_estimes` doit rester prudent et réaliste
-- Ne pas recalculer de score global
-- N'invente pas de données absentes
-- Si l'information est insuffisante, reste modéré plutôt que spéculatif
-- Les bonus doivent être rares et mérités
-- Les malus doivent être francs si la liquidité ou la sortie semblent mauvaises
-
-**Ta mission :**
-1. Estime un bonus/malus de micro-localisation en te demandant si un investisseur réactif voudrait vraiment se positionner vite
-2. Estime un bonus/malus de qualité intrinsèque du bien pour la location et la revente
-3. Estime les travaux seulement s'il existe de vrais signaux de défaut ou d'obsolescence
-4. Rédige une synthèse courte orientée décision, comme pour un investisseur professionnel
-5. Liste les risques principaux qui peuvent détruire la valeur ou la vitesse de sortie
-
-**Repères d'analyse**
-- Bonus micro-localisation: zone très recherchée, excellente desserte, quartier liquide, adresse crédible pour petite surface
-- Malus micro-localisation: marché lent, desserte faible, commune peu demandée, revente ou relocation difficiles
-- Bonus qualité: plan efficace, étage correct, ascenseur si étage élevé, balcon/terrasse, cave, bon état, luminosité
-- Malus qualité: RDC pénalisant, gros travaux, distribution faible, bien atypique, nuisances probables
-- Travaux: reste crédible et conservateur, ne gonfle pas sans signal texte réel
-
-Réponds UNIQUEMENT en JSON valide :
-{{
-    "micro_localisation_bonus": <int -10..10>,
-    "qualite_bien_bonus": <int -10..10>,
-    "travaux_estimes": <float>,
-    "raison_score": "<explication 2-3 phrases>",
-    "risques": ["<risque1>", "<risque2>"]
-}}"""
+    return llm["user_prompt_template"].format(
+        title=listing.title,
+        listing_type=listing.listing_type or "inconnu",
+        city=listing.city or "inconnue",
+        postal_code=listing.postal_code or "?",
+        address=listing.address or "inconnue",
+        surface=surface,
+        nb_pieces=listing.nb_pieces or "inconnues",
+        nb_chambres=listing.nb_chambres or "inconnues",
+        floor=listing.type_etage or listing.etage or "inconnu",
+        components=composants,
+        reserve_price=prix,
+        price_m2=prix_m2,
+        occupancy=occupation,
+        auction_date=audience,
+        auction_location=lieu_audience,
+        visit_date=visite,
+        property_details=details,
+        source_url=listing.source_url,
+        loyer_ref=loyer_ref,
+        occupation_discount_hint=scoring["occupation_discount_hint"],
+        frais_adjudication_percent=int(float(market["frais_adjudication_ratio"]) * 100),
+        strategy_target=scoring["strategy_target"],
+        absolute_target=scoring["absolute_target"],
+        current_category=categorie_actuelle,
+    )
 
 def _clip(value: float, lower: float, upper: float) -> float:
     return max(lower, min(upper, value))
@@ -230,7 +174,7 @@ def _is_paris(listing: AuctionListing) -> bool:
 
 
 def _is_premium_near_paris(listing: AuctionListing) -> bool:
-    return _city_slug(listing) in _PREMIUM_NEAR_PARIS
+    return _city_slug(listing) in set(_market_config()["premium_near_paris"])
 
 
 def _extract_typology(listing: AuctionListing) -> str:
@@ -251,47 +195,39 @@ def _extract_typology(listing: AuctionListing) -> str:
 
 
 def _score_localisation(listing: AuctionListing, micro_bonus: int) -> int:
+    bases = _scoring_rules()["location_bases"]
     postal_prefix = (listing.postal_code or "")[:2]
     if _is_paris(listing):
-        base = 100
+        base = int(bases["paris"])
     elif _is_premium_near_paris(listing):
-        base = 82
+        base = int(bases["premium_near_paris"])
     elif postal_prefix in {"92", "93", "94"}:
-        base = 64
+        base = int(bases["idf_core"])
     elif postal_prefix in {"77", "78", "91", "95"}:
-        base = 42
+        base = int(bases["idf_outer"])
     else:
-        base = 28
+        base = int(bases["other"])
     return _round_int(base + micro_bonus)
 
 
 def _score_typologie(listing: AuctionListing) -> int:
+    config = _scoring_rules()["typology_scores"]
     typology = _extract_typology(listing)
     if typology in {"STUDIO", "T1", "F1", "T2", "F2"}:
-        return 100
+        return int(config["target"])
     if typology in {"T3", "F3"}:
-        return 60
+        return int(config["medium"])
     if typology in {"T4", "F4", "T5", "F5"}:
-        return 20
+        return int(config["large"])
     if listing.surface_m2 and listing.surface_m2 <= 35:
-        return 85
-    return 40
+        return int(config["small_surface_fallback"])
+    return int(config["default"])
 
 
 def _score_surface(surface_m2: float | None) -> int:
     if not surface_m2 or surface_m2 <= 0:
-        return 20
-    if surface_m2 < 9:
-        return 10
-    if surface_m2 <= 18:
-        return 90
-    if surface_m2 <= 25:
-        return 100
-    if surface_m2 <= 35:
-        return 86
-    if surface_m2 <= 45:
-        return 60
-    return 20
+        return int(_scoring_rules()["surface_scores"][0]["score"])
+    return _range_score(surface_m2, _scoring_rules()["surface_scores"][1:], 20)
 
 
 def _weighted_score(items: list[tuple[int, float]]) -> int:
@@ -304,20 +240,25 @@ def _estimate_travaux(listing: AuctionListing, llm_estimate: float) -> float:
     reserve_price = listing.reserve_price or 0.0
     details = listing.property_details or {}
     condition_signals = set(details.get("condition_signals") or [])
+    rules = _scoring_rules()["travaux_rules"]
     if llm_estimate > 0:
         return round(llm_estimate, 2)
     if "a_renover" in condition_signals:
-        return round(max(12000.0, reserve_price * 0.08), 2)
+        return round(max(float(rules["a_renover"]["minimum"]), reserve_price * float(rules["a_renover"]["ratio"])), 2)
     if "a_rafraichir" in condition_signals:
-        return round(max(6000.0, reserve_price * 0.04), 2)
+        return round(max(float(rules["a_rafraichir"]["minimum"]), reserve_price * float(rules["a_rafraichir"]["ratio"])), 2)
     if "refait_a_neuf" in condition_signals or "bon_etat" in condition_signals:
-        return round(max(0.0, reserve_price * 0.01), 2)
-    return round(max(2500.0 if reserve_price else 0.0, reserve_price * 0.02), 2)
+        return round(max(0.0, reserve_price * float(rules["bon_etat"]["ratio"])), 2)
+    return round(
+        max(float(rules["default"]["minimum_if_priced"]) if reserve_price else 0.0, reserve_price * float(rules["default"]["ratio"])),
+        2,
+    )
 
 
 def _reference_price_m2(listing: AuctionListing) -> float:
     prefix = (listing.postal_code or "")[:2]
-    return _REFERENCE_PRICE_M2.get(prefix, 2500.0)
+    market = _market_config()
+    return float(market["reference_price_m2"].get(prefix, market["reference_price_m2_default"]))
 
 
 def _market_values(listing: AuctionListing, travaux_estimes: float) -> tuple[float, float, float]:
@@ -325,24 +266,14 @@ def _market_values(listing: AuctionListing, travaux_estimes: float) -> tuple[flo
     surface_m2 = listing.surface_m2 or 0.0
     reference_price_m2 = _reference_price_m2(listing)
     valeur_marche_estimee = round(reference_price_m2 * surface_m2, 2) if surface_m2 else round(reserve_price * 1.15, 2)
-    coeff_occupation = 0.78 if (listing.occupancy_status or "").lower() == "occupe" else 1.0
+    coeff_occupation = _occupancy_discount_coefficient(listing)
     valeur_marche_ajustee = round(valeur_marche_estimee * coeff_occupation, 2)
-    cout_total = round(reserve_price * (1 + _FRAIS_ADJUDICATION_RATIO) + travaux_estimes, 2)
+    cout_total = round(reserve_price * (1 + float(_market_config()["frais_adjudication_ratio"])) + travaux_estimes, 2)
     return valeur_marche_estimee, valeur_marche_ajustee, cout_total
 
 
 def _score_ratio(ratio: float | None) -> int:
-    if ratio is None:
-        return 25
-    if ratio <= 0.70:
-        return 100
-    if ratio <= 0.78:
-        return 88
-    if ratio <= 0.85:
-        return 67
-    if ratio <= 0.92:
-        return 40
-    return 15
+    return _range_score(ratio, _scoring_rules()["price_ratio_scores"], 15) if ratio is not None else 25
 
 
 def _score_price_block(listing: AuctionListing, travaux_estimes: float) -> tuple[int, float, float]:
@@ -360,57 +291,56 @@ def _score_price_block(listing: AuctionListing, travaux_estimes: float) -> tuple
     target_score = _score_ratio(target_ratio)
     if relative_m2 is None:
         price_m2_score = 30
-    elif relative_m2 <= 0.70:
-        price_m2_score = 100
-    elif relative_m2 <= 0.82:
-        price_m2_score = 85
-    elif relative_m2 <= 0.95:
-        price_m2_score = 62
     else:
-        price_m2_score = 22
+        price_m2_score = _range_score(relative_m2, _scoring_rules()["relative_m2_scores"], 22)
 
     score_prix = _weighted_score([(start_score, 5), (target_score, 15), (price_m2_score, 5)])
     return score_prix, valeur_marche_estimee, valeur_marche_ajustee
 
 
 def _score_liquidite(listing: AuctionListing, micro_bonus: int) -> int:
+    config = _scoring_rules()["liquidity"]
     typology_score = _score_typologie(listing)
     surface_score = _score_surface(listing.surface_m2)
     location_score = _score_localisation(listing, micro_bonus)
 
     if _is_paris(listing):
-        tension = 98
-        transport = 95
+        profile = config["tension_transport"]["paris"]
     elif _is_premium_near_paris(listing):
-        tension = 84
-        transport = 88
+        profile = config["tension_transport"]["premium_near_paris"]
     elif (listing.postal_code or "")[:2] in {"92", "93", "94"}:
-        tension = 70
-        transport = 74
+        profile = config["tension_transport"]["idf_core"]
     else:
-        tension = 48
-        transport = 46
+        profile = config["tension_transport"]["other"]
 
-    liquidite_revente = _weighted_score([(typology_score, 0.45), (surface_score, 0.35), (location_score, 0.20)])
-    return _weighted_score([(tension, 8), (liquidite_revente, 6), (transport, 6)])
+    liquidite_revente = _weighted_score(
+        [
+            (typology_score, float(config["resale_weights"]["typology"])),
+            (surface_score, float(config["resale_weights"]["surface"])),
+            (location_score, float(config["resale_weights"]["location"])),
+        ]
+    )
+    return _weighted_score(
+        [
+            (int(profile["tension"]), float(config["global_weights"]["tension"])),
+            (liquidite_revente, float(config["global_weights"]["resale"])),
+            (int(profile["transport"]), float(config["global_weights"]["transport"])),
+        ]
+    )
 
 
 def _score_occupation(listing: AuctionListing) -> int:
     occupancy = (listing.occupancy_status or "").lower()
-    if occupancy == "libre":
-        free_score = 100
-        risk_score = 95
-    elif occupancy == "occupe":
-        free_score = 30
-        risk_score = 25
-    else:
-        free_score = 45
-        risk_score = 45
+    config = _scoring_rules()["occupation_scores"]
+    profile = config.get(occupancy, config["default"])
+    free_score = int(profile["free_score"])
+    risk_score = int(profile["risk_score"])
     return _weighted_score([(free_score, 10), (risk_score, 5)])
 
 
 def _score_qualite(listing: AuctionListing, quality_bonus: int) -> int:
     details = listing.property_details or {}
+    config = _scoring_rules()["quality"]
     positive = 0
     if listing.balcon or listing.terrasse or listing.jardin:
         positive += 1
@@ -426,35 +356,38 @@ def _score_qualite(listing: AuctionListing, quality_bonus: int) -> int:
     condition_signals = set(details.get("condition_signals") or [])
     negative = 0
     if "a_renover" in condition_signals:
-        negative += 2
+        negative += int(config["renovation_penalty"])
     elif "a_rafraichir" in condition_signals:
-        negative += 1
+        negative += int(config["refresh_penalty"])
     if listing.type_etage == "rez_de_chaussee":
-        negative += 1
+        negative += int(config["rdc_penalty"])
 
-    base = 55 + positive * 9 - negative * 12
+    base = int(config["base"]) + positive * int(config["positive_step"]) - negative * int(config["negative_step"])
     return _round_int(base + quality_bonus)
 
 
 def _bonus_strategique(listing: AuctionListing) -> int:
     typology = _extract_typology(listing)
-    target_typology = typology in {"STUDIO", "T1", "F1", "T2", "F2"}
     surface_m2 = listing.surface_m2 or 0.0
-    if _is_paris(listing) and target_typology and 18 <= surface_m2 <= 25:
-        return 10
-    if _is_paris(listing) and target_typology and 9 <= surface_m2 <= 35:
-        return 7
-    if _is_premium_near_paris(listing) and target_typology and 9 <= surface_m2 <= 35:
-        return 4
+    for rule in _scoring_rules()["strategic_bonus_rules"]:
+        if typology not in set(rule["target_typologies"]):
+            continue
+        if not float(rule["surface_min"]) <= surface_m2 <= float(rule["surface_max"]):
+            continue
+        if rule["location"] == "paris" and _is_paris(listing):
+            return int(rule["bonus"])
+        if rule["location"] == "premium_near_paris" and _is_premium_near_paris(listing):
+            return int(rule["bonus"])
     return 0
 
 
 def _categorie_investissement(score_final: int) -> str:
-    if score_final >= 85:
+    thresholds = _scoring_rules()["category_thresholds"]
+    if score_final >= int(thresholds["opportunite_rare"]):
         return "opportunite_rare"
-    if score_final >= 70:
+    if score_final >= int(thresholds["prioritaire"]):
         return "prioritaire"
-    if score_final >= 55:
+    if score_final >= int(thresholds["a_etudier"]):
         return "a_etudier"
     return "hors_cible"
 
@@ -468,12 +401,13 @@ def _recommandation_from_category(category: str) -> str:
 
 
 def _occupancy_discount_coefficient(listing: AuctionListing) -> float:
-    return 0.78 if (listing.occupancy_status or "").lower() == "occupe" else 1.0
+    config = _market_config()["occupancy_discount_coefficients"]
+    return float(config["occupe"]) if (listing.occupancy_status or "").lower() == "occupe" else float(config["default"])
 
 
 def _prix_max(valeur_marche_estimee: float, listing: AuctionListing, travaux_estimes: float, coefficient: float) -> float:
     valeur_ajustee = valeur_marche_estimee * _occupancy_discount_coefficient(listing)
-    return round(max(0.0, valeur_ajustee * coefficient - travaux_estimes) / (1 + _FRAIS_ADJUDICATION_RATIO), 2)
+    return round(max(0.0, valeur_ajustee * coefficient - travaux_estimes) / (1 + float(_market_config()["frais_adjudication_ratio"])), 2)
 
 
 def _fetch_qualitative_signals(listing: AuctionListing) -> AuctionQualitativeSignals:
@@ -483,24 +417,20 @@ def _fetch_qualitative_signals(listing: AuctionListing) -> AuctionQualitativeSig
     try:
         from openai import OpenAI
 
+        llm = _llm_config()
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         response = client.chat.completions.create(
-            model="gpt-5.4-mini",
+            model=llm["model"],
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "Tu es un agent immobilier professionnel expert des ventes judiciaires en France. "
-                        "Tu repères les opportunités en or avant la concurrence, mais tu restes factuel, discipliné "
-                        "et prudent sur les risques. Tu ne produis jamais de score global libre. "
-                        "Tu réponds uniquement en JSON valide, sans texte additionnel."
-                    ),
+                    "content": llm["system_prompt"],
                 },
                 {"role": "user", "content": _build_prompt(listing)},
             ],
             response_format={"type": "json_object"},
-            temperature=0.1,
-            timeout=20,
+            temperature=float(llm["temperature"]),
+            timeout=float(llm["timeout"]),
         )
         raw = response.choices[0].message.content or "{}"
         data = json.loads(raw)
@@ -516,6 +446,7 @@ def _fetch_qualitative_signals(listing: AuctionListing) -> AuctionQualitativeSig
 
 
 def _compute_scoring(listing: AuctionListing, qualitative: AuctionQualitativeSignals) -> AuctionScoringBreakdown:
+    config = _scoring_rules()
     loyer_estime = _loyer_reference(listing.postal_code, listing.surface_m2)
     travaux_estimes = _estimate_travaux(listing, qualitative.travaux_estimes)
     score_cible = _weighted_score(
@@ -530,13 +461,14 @@ def _compute_scoring(listing: AuctionListing, qualitative: AuctionQualitativeSig
     score_occupation = _score_occupation(listing)
     score_qualite_bien = _score_qualite(listing, qualitative.qualite_bien_bonus)
     bonus_strategique = _bonus_strategique(listing)
+    score_weights = config["score_weights"]
 
     score_base = (
-        score_cible * 0.35
-        + score_prix * 0.25
-        + score_liquidite * 0.20
-        + score_occupation * 0.15
-        + score_qualite_bien * 0.05
+        score_cible * float(score_weights["cible"])
+        + score_prix * float(score_weights["prix"])
+        + score_liquidite * float(score_weights["liquidite"])
+        + score_occupation * float(score_weights["occupation"])
+        + score_qualite_bien * float(score_weights["qualite"])
     )
     score_global = _round_int(min(100.0, score_base + bonus_strategique))
     categorie = _categorie_investissement(score_global)
@@ -559,8 +491,18 @@ def _compute_scoring(listing: AuctionListing, qualitative: AuctionQualitativeSig
         travaux_estimes=travaux_estimes,
         valeur_marche_estimee=valeur_marche_estimee,
         valeur_marche_ajustee=valeur_marche_ajustee,
-        prix_max_cible=_prix_max(valeur_marche_estimee, listing, travaux_estimes, 0.78),
-        prix_max_agressif=_prix_max(valeur_marche_estimee, listing, travaux_estimes, 0.70),
+        prix_max_cible=_prix_max(
+            valeur_marche_estimee,
+            listing,
+            travaux_estimes,
+            float(config["prix_max_coefficients"]["cible"]),
+        ),
+        prix_max_agressif=_prix_max(
+            valeur_marche_estimee,
+            listing,
+            travaux_estimes,
+            float(config["prix_max_coefficients"]["agressif"]),
+        ),
         raison_score=qualitative.raison_score,
         risques=qualitative.risques,
         recommandation=_recommandation_from_category(categorie),
