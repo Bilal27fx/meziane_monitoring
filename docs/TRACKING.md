@@ -1,6 +1,6 @@
 # Tracking — Meziane Monitoring
 
-**Mis à jour :** 2026-04-03  
+**Mis à jour :** 2026-04-04  
 Source de vérité sur l'état de toutes les implémentations.
 Lifecycle complet : `STANDARDS.md`
 
@@ -26,6 +26,7 @@ Lifecycle complet : `STANDARDS.md`
 
 | Nom | Description | Date | Refactor doc |
 |---|---|---|---|
+| Fix extraction Licitor | Date enchère + lieu visite manquants — 6 bugs corrigés | 2026-04-04 | [refactors/2026-04-04_licitor-extraction-fix.md](refactors/2026-04-04_licitor-extraction-fix.md) |
 | Agent Licitor V2 | URLs backend + scoring LLM post-ingestion | 2026-04-03 | [refactors/2026-04-03_agent-licitor-v2.md](refactors/2026-04-03_agent-licitor-v2.md) |
 | Restructuration documentation | Nettoyage doc, nouveau lifecycle STANDARDS.md | 2026-04-03 | [refactors/2026-04-03_restructuration-documentation.md](refactors/2026-04-03_restructuration-documentation.md) |
 | RFC-008 | Sécurité Auth + Performance suite | 2026-03-24 | [archive/RFC/RFC-008](archive/RFC/RFC-008_security-auth-perf/README.md) |

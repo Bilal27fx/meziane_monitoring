@@ -29,6 +29,8 @@ class QuittanceResponse(BaseModel):
     locataire_id: int
     mois: str
     montant: float
+    montant_loyer: float = 0
+    montant_charges: float = 0
     statut: str
     date_paiement: Optional[date] = None
     created_at: str = ""
@@ -50,6 +52,8 @@ class QuittanceResponse(BaseModel):
             "locataire_id": bail.locataire_id if bail else 0,
             "mois": mois_label,
             "montant": obj.montant_total,
+            "montant_loyer": float(obj.montant_loyer or 0),
+            "montant_charges": float(obj.montant_charges or 0),
             "statut": STATUT_MAP.get(statut_raw, statut_raw),
             "date_paiement": obj.date_paiement,
             "created_at": "",

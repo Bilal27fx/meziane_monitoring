@@ -147,7 +147,9 @@ class PatrimoineQueries:
 
         result: list[BienResponse] = []
         for bien, sci_nom, bail_actif, quittance in rows:
-            loyer_mensuel = float(bail_actif.loyer_mensuel) if bail_actif and bail_actif.loyer_mensuel is not None else None
+            loyer_mensuel = None
+            if bail_actif:
+                loyer_mensuel = float(bail_actif.loyer_mensuel or 0) + float(bail_actif.charges_mensuelles or 0)
             tri_net = None
             if loyer_mensuel and bien.prix_acquisition:
                 tri_net = round((loyer_mensuel * 12 / bien.prix_acquisition) * 100, 2)

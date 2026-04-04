@@ -220,11 +220,6 @@ class PatrimoineService:  # Service gestion patrimoine (SCI, Biens, Locataires)
             self.db.query(Quittance)
             .filter(
                 Quittance.bail_id == bail_id,
-                Quittance.statut.in_([
-                    StatutQuittance.EN_ATTENTE,
-                    StatutQuittance.IMPAYE,
-                    StatutQuittance.PARTIEL,
-                ]),
             )
             .all()
         )

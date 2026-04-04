@@ -12,7 +12,7 @@ const INTEGRATIONS = [
   { name: 'Anthropic Claude', key: 'ANTHROPIC_API_KEY', statut: 'ok', description: 'Analyse IA' },
   { name: 'OpenAI', key: 'OPENAI_API_KEY', statut: 'error', description: 'Fallback LLM' },
   { name: 'SMTP', key: 'SMTP_HOST', statut: 'ok', description: 'Notifications email' },
-  { name: 'Twilio', key: 'TWILIO_SID', statut: 'warning', description: 'SMS alertes' },
+  { name: 'Telegram Bot', key: 'TELEGRAM_BOT_TOKEN', statut: 'warning', description: 'Alertes Telegram' },
 ]
 
 const ENV_VARS = [

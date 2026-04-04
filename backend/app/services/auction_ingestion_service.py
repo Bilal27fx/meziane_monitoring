@@ -23,6 +23,10 @@ from app.models.auction_source import AuctionSource
 from app.services.auction_fetch_service import AuctionFetchService
 from app.services.auction_run_log_service import log_agent_run_event
 from app.services.auction_scoring_service import score_listing
+from app.services.telegram_notification_service import (
+    is_auction_notification_eligible,
+    send_auction_listing_notification,
+)
 
 
 def build_source_adapter(source_code: str) -> SourceAdapter:
@@ -52,6 +56,8 @@ class AuctionIngestionService:
             "listings_updated": 0,
             "listings_normalized": 0,
             "listings_scored": 0,
+            "notifications_sent": 0,
+            "data_quality": self._init_data_quality_summary(),
         }
 
         raw_sessions = self.adapter.parse_sessions(session_html, page_url)
@@ -74,14 +80,80 @@ class AuctionIngestionService:
                         detail = self.adapter.parse_listing_detail(detail_html, listing.source_url, raw_listing)
                         self._apply_listing_detail(listing, detail.facts)
                         counters["listings_normalized"] += 1
+                        self._accumulate_data_quality(counters["data_quality"], listing)
 
-                        if listing.score_global is None:
-                            scored = score_listing(listing, self.db)
-                            if scored:
-                                counters["listings_scored"] += 1
+                        scored = score_listing(listing, self.db)
+                        if scored:
+                            counters["listings_scored"] += 1
+                            if is_auction_notification_eligible(listing):
+                                if send_auction_listing_notification(listing):
+                                    listing.telegram_notified = True
+                                    counters["notifications_sent"] += 1
 
         self.db.commit()
         return counters
+
+    def _init_data_quality_summary(self) -> dict[str, Any]:
+        return {
+            "normalized_listings": 0,
+            "complete_listings": 0,
+            "missing_auction_date": 0,
+            "missing_visit_dates": 0,
+            "missing_visit_location": 0,
+            "missing_address": 0,
+            "incomplete_samples": [],
+        }
+
+    def _accumulate_data_quality(self, summary: dict[str, Any], listing: AuctionListing) -> None:
+        snapshot = self._build_listing_data_quality_snapshot(listing)
+        summary["normalized_listings"] += 1
+
+        if snapshot["is_complete"]:
+            summary["complete_listings"] += 1
+            return
+
+        for field in snapshot["missing_fields"]:
+            if field == "auction_date":
+                summary["missing_auction_date"] += 1
+            elif field == "visit_dates":
+                summary["missing_visit_dates"] += 1
+            elif field == "visit_location":
+                summary["missing_visit_location"] += 1
+            elif field == "address":
+                summary["missing_address"] += 1
+
+        samples = summary["incomplete_samples"]
+        if len(samples) < 10:
+            samples.append(
+                {
+                    "listing_id": listing.id,
+                    "source_url": listing.source_url,
+                    "missing_fields": snapshot["missing_fields"],
+                }
+            )
+
+    def _build_listing_data_quality_snapshot(self, listing: AuctionListing) -> dict[str, Any]:
+        missing_fields: list[str] = []
+        visit_payload = listing.property_details.get("visit") if isinstance(listing.property_details, dict) else None
+        extracted_visit_location = (
+            visit_payload.get("location")
+            if isinstance(visit_payload, dict) and visit_payload.get("location")
+            else None
+        )
+
+        if listing.auction_date is None:
+            missing_fields.append("auction_date")
+        if not listing.visit_dates:
+            missing_fields.append("visit_dates")
+        if not extracted_visit_location:
+            missing_fields.append("visit_location")
+        if not listing.address:
+            missing_fields.append("address")
+
+        return {
+            "is_complete": not missing_fields,
+            "missing_fields": missing_fields,
+        }
 
     def _upsert_session(self, source: AuctionSource, raw_session: RawSession) -> tuple[AuctionSession, bool]:
         session = (
@@ -264,7 +336,9 @@ def execute_auction_ingestion_run(db: Session, run_id: int) -> dict[str, Any]:
         "listings_updated": 0,
         "listings_normalized": 0,
         "listings_scored": 0,
+        "notifications_sent": 0,
         "session_pages_processed": 0,
+        "data_quality": service._init_data_quality_summary(),
     }
 
     try:
@@ -298,6 +372,19 @@ def execute_auction_ingestion_run(db: Session, run_id: int) -> dict[str, Any]:
                 payload={"url": page_url, **counters},
             )
             for key, value in counters.items():
+                if key == "data_quality":
+                    totals["data_quality"]["normalized_listings"] += value["normalized_listings"]
+                    totals["data_quality"]["complete_listings"] += value["complete_listings"]
+                    totals["data_quality"]["missing_auction_date"] += value["missing_auction_date"]
+                    totals["data_quality"]["missing_visit_dates"] += value["missing_visit_dates"]
+                    totals["data_quality"]["missing_visit_location"] += value["missing_visit_location"]
+                    totals["data_quality"]["missing_address"] += value["missing_address"]
+                    remaining_slots = max(0, 10 - len(totals["data_quality"]["incomplete_samples"]))
+                    if remaining_slots:
+                        totals["data_quality"]["incomplete_samples"].extend(
+                            value["incomplete_samples"][:remaining_slots]
+                        )
+                    continue
                 totals[key] += value
             totals["session_pages_processed"] += 1
 

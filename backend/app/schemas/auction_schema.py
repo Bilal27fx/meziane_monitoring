@@ -140,6 +140,9 @@ class AuctionListingResponse(BaseModel):
     occupancy_status: Optional[str] = None
     visit_dates: Optional[list[str]] = None
     auction_date: Optional[datetime] = None
+    auction_tribunal: Optional[str] = None
+    auction_location: Optional[str] = None
+    visit_location: Optional[str] = None
     status: AuctionListingStatus
     published_at: Optional[datetime] = None
     last_seen_at: datetime
@@ -150,8 +153,19 @@ class AuctionListingResponse(BaseModel):
     score_localisation: Optional[int] = None
     score_prix: Optional[int] = None
     score_potentiel: Optional[int] = None
+    score_cible_paris_petite_surface: Optional[int] = None
+    score_liquidite: Optional[int] = None
+    score_occupation: Optional[int] = None
+    score_qualite_bien: Optional[int] = None
+    bonus_strategique: Optional[int] = None
+    categorie_investissement: Optional[str] = None
     loyer_estime: Optional[float] = None
     rentabilite_brute: Optional[float] = None
+    travaux_estimes: Optional[float] = None
+    valeur_marche_estimee: Optional[float] = None
+    valeur_marche_ajustee: Optional[float] = None
+    prix_max_cible: Optional[float] = None
+    prix_max_agressif: Optional[float] = None
     raison_score: Optional[str] = None
     risques_llm: Optional[list[str]] = None
     recommandation: Optional[str] = None
