@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from app.models.agent_definition import AgentDefinition, AgentStatus, AgentType
 from app.models.agent_run import AgentRun, AgentRunStatus, AgentTriggerType
 from app.models.agent_run_event import AgentRunEvent
 from app.models.auction_listing import AuctionListing, AuctionListingStatus
 from app.models.auction_source import AuctionSource, AuctionSourceStatus
+from app.models.auction_session import AuctionSession
 from app.services.auction_ingestion_service import execute_auction_ingestion_run
 
 
@@ -182,6 +185,66 @@ def test_execute_auction_ingestion_run_is_idempotent_for_existing_records(db_ses
     assert result["notifications_sent"] == 0
     assert listings[0].reserve_price == 380000
     assert listings[0].score_global is not None
+
+
+def test_execute_auction_ingestion_run_replaces_unknown_session_values_with_detail_header(db_session, monkeypatch):
+    monkeypatch.setattr("app.services.auction_ingestion_service.score_listing", _stub_score_listing)
+    monkeypatch.setattr("app.services.auction_ingestion_service.send_auction_listing_notification", lambda listing: True)
+
+    run = _build_run(db_session, source_code="licitor")
+    run.parameter_snapshot = {
+        "source_code": "licitor",
+        "session_pages": [
+            {
+                "url": "https://www.licitor.com/ventes-judiciaires-immobilieres/creteil/vente.html",
+                "html": """
+                <html>
+                  <body>
+                    <h1>Ventes judiciaires immobilieres</h1>
+                    <p>Audience 06/04/2026 - 1 annonce</p>
+                    <a href="/annonce/108033.html">
+                      Un appartement - Mise a prix 60 000 EUR - 25,57 m² - Villeneuve-Saint-Georges 94190
+                    </a>
+                  </body>
+                </html>
+                """,
+                "detail_pages": {
+                    "https://www.licitor.com/annonce/108033.html": """
+                    <html>
+                      <body>
+                        <h1>Tribunal Judiciaire de Créteil (Val de Marne)</h1>
+                        <p>Vente aux enchères publiques</p>
+                        <p>jeudi 16 avril 2026 à 9h30</p>
+                        <p>UN APPARTEMENT</p>
+                        <p>de 25,57 m², au 1er étage, comprenant : entrée, pièce, coin cuisine, salle d'eau avec wc</p>
+                        <p>Loué et occupé</p>
+                        <p>Mise à prix : 60 000 €</p>
+                        <p>Villeneuve-Saint-Georges</p>
+                        <p>8 bis, rue de Verdun</p>
+                        <p>Afficher le plan</p>
+                        <p>Visite sur place lundi 11 mai 2026 à 14h</p>
+                        <p>Maître Florence Chopin, Avocat</p>
+                      </body>
+                    </html>
+                    """,
+                },
+            }
+        ],
+    }
+    db_session.commit()
+
+    result = execute_auction_ingestion_run(db_session, run.id)
+
+    listing = db_session.query(AuctionListing).one()
+    session = db_session.query(AuctionSession).one()
+
+    assert result["status"] == "success"
+    assert session.tribunal == "TJ Créteil"
+    assert session.session_datetime == datetime(2026, 4, 16, 9, 30)
+    assert session.city == "Villeneuve-Saint-Georges"
+    assert listing.city == "Villeneuve-Saint-Georges"
+    assert listing.address == "Villeneuve-Saint-Georges\n8 bis, rue de Verdun"
+    assert listing.visit_location == "Villeneuve-Saint-Georges\n8 bis, rue de Verdun"
 
 
 def test_execute_auction_ingestion_run_logs_failure(db_session):

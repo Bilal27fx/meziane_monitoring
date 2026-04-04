@@ -104,9 +104,12 @@ class LicitorAuctionAdapter:
     def parse_listing_detail(self, html: str, page_url: str, listing: RawListing) -> RawListingDetail:
         soup = BeautifulSoup(html, "html.parser")
         page_text = soup.get_text("\n", strip=True)
+        page_text_space = soup.get_text(" ", strip=True)
         floor_info = self._extract_floor_info(page_text)
         extracted_address = self._extract_address(page_text)
         visit_details = self._extract_visit_details(page_text, extracted_address)
+        auction_date = self._extract_session_datetime(page_text_space, page_url)
+        auction_tribunal = self._extract_tribunal(page_text_space, page_url)
 
         facts = {
             "title": self._first_non_empty(
@@ -126,13 +129,15 @@ class LicitorAuctionAdapter:
             "parking": self._extract_amenity_presence(page_text, ["parking", "stationnement"], ["sans parking", "sans stationnement"]),
             "box": self._extract_amenity_presence(page_text, ["box", "garage"], ["sans box", "sans garage"]),
             "jardin": self._extract_amenity_presence(page_text, ["jardin"], ["sans jardin"]),
-            "postal_code": self._extract_postal_code(page_text) or listing.postal_code,
+            "postal_code": self._extract_postal_code(extracted_address or "") or listing.postal_code,
             "occupancy_status": self._extract_occupancy_status(page_text),
             "lawyer_phone": self._extract_phone(page_text),
             "documents": self._extract_documents(soup, page_url),
             "visit_dates": visit_details["dates"],
             "address": extracted_address,
             "property_details": self._extract_property_details(page_text, visit_details),
+            "auction_date": auction_date,
+            "auction_tribunal": auction_tribunal,
         }
         return RawListingDetail(listing=listing, facts=facts)
 
@@ -240,7 +245,30 @@ class LicitorAuctionAdapter:
 
     def _extract_room_count(self, text: str) -> int | None:
         match = re.search(r"\b(\d+)\s*pi[eè]ces?\b", text, flags=re.IGNORECASE)
-        return int(match.group(1)) if match else None
+        if match:
+            return int(match.group(1))
+
+        word_to_number = {
+            "un": 1,
+            "une": 1,
+            "deux": 2,
+            "trois": 3,
+            "quatre": 4,
+            "cinq": 5,
+            "six": 6,
+            "sept": 7,
+            "huit": 8,
+            "neuf": 9,
+            "dix": 10,
+        }
+        word_match = re.search(
+            r"\b(un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix)\s+pi[eè]ces?\b",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if word_match:
+            return word_to_number[word_match.group(1).lower()]
+        return None
 
     def _extract_bedroom_count(self, text: str) -> int | None:
         match = re.search(r"\b(\d+)\s*chambres?\b", text, flags=re.IGNORECASE)
@@ -280,6 +308,15 @@ class LicitorAuctionAdapter:
         city_match = re.search(r"\bParis(?:\s+\d{1,2}(?:eme|er)?)?\b", text, flags=re.IGNORECASE)
         if city_match:
             return city_match.group(0)
+        generic_match = re.search(
+            r"-\s*([A-Za-zÀ-ÿ'’\- ]+?)\s+(?:\d{5})\b",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if generic_match:
+            city = re.sub(r"\s+", " ", generic_match.group(1)).strip(" ,;:-")
+            if city:
+                return city
         return fallback_city
 
     def _extract_occupancy_status(self, text: str) -> str | None:
@@ -325,11 +362,11 @@ class LicitorAuctionAdapter:
         date_pattern = re.compile(
             r"(?:(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+)?"
             rf"\d{{1,2}}(?:er)?\s+(?:{month_labels})(?:\s+\d{{4}})?"
-            r"(?:\s+de\s+\d{1,2}h(?:\d{2})?\s+[aà]\s+\d{1,2}h(?:\d{2})?)?",
+            r"(?:\s+de\s+\d{1,2}h(?:\d{2})?\s+[aà]\s+\d{1,2}h(?:\d{2})?|\s+[aà]\s+\d{1,2}h(?:\d{2})?)?",
             flags=re.IGNORECASE,
         )
         numeric_date_pattern = re.compile(
-            r"\b\d{1,2}/\d{1,2}/\d{2,4}(?:\s+de\s+\d{1,2}h(?:\d{2})?\s+[aà]\s+\d{1,2}h(?:\d{2})?)?",
+            r"\b\d{1,2}/\d{1,2}/\d{2,4}(?:\s+de\s+\d{1,2}h(?:\d{2})?\s+[aà]\s+\d{1,2}h(?:\d{2})?|\s+[aà]\s+\d{1,2}h(?:\d{2})?)?",
             flags=re.IGNORECASE,
         )
         explicit_location_pattern = re.compile(
@@ -353,6 +390,9 @@ class LicitorAuctionAdapter:
             if location_match:
                 visit_location = location_match.group(1).strip(" ,;:-")
                 break
+            if fallback_address and any("sur place" in line.lower() for line in block_lines):
+                visit_location = fallback_address
+                break
 
         return {
             "dates": visit_dates,
@@ -361,12 +401,19 @@ class LicitorAuctionAdapter:
 
     def _extract_address(self, text: str) -> str | None:
         lines = self._clean_lines(text)
+        lawyer_start_index = next((index for index, line in enumerate(lines) if self._is_lawyer_line(line)), None)
+        relevant_lines = lines[:lawyer_start_index] if lawyer_start_index is not None else lines
         filtered_lines = [
             line
-            for line in lines
+            for line in relevant_lines
             if not self._is_non_property_line(line)
         ]
         postal_fragment = r"(?:[0-9]{5})\s+[A-Za-zÀ-ÿ’’\- ]+"
+        street_fragment = (
+            r"\d{1,4}\s*,?\s*(?:bis|ter|quater)?\s*,?\s*"
+            r"(?:rue|avenue|av\.?|boulevard|bd\.?|all[ée]e?|impasse|chemin|route|quai|place|square|villa|passage|cours)\b"
+        )
+        city_line_pattern = re.compile(r"^(?:Paris\s+\d{1,2}(?:er|eme|ème)?|[A-Za-zÀ-ÿ'’\- ]{2,60})$", flags=re.IGNORECASE)
 
         prefixed_patterns = [
             rf"\b(?:adresse|situ[ée]?\s+a|sis|situé au|située au)\s*[:\-]?\s*(\d{{1,4}}[^,\n]*?,\s*{postal_fragment})",
@@ -387,6 +434,18 @@ class LicitorAuctionAdapter:
                 match = re.search(pattern, line, flags=re.IGNORECASE)
                 if match:
                     return re.sub(r"\s+", " ", match.group(1)).strip(" ,;:-")
+
+        street_pattern = re.compile(rf"\b({street_fragment}[^\n]*)", flags=re.IGNORECASE)
+        for index, line in enumerate(filtered_lines):
+            street_match = street_pattern.search(line)
+            if not street_match:
+                continue
+            street_line = street_match.group(1).strip(" ,;:-")
+            if index > 0:
+                previous_line = filtered_lines[index - 1].strip(" ,;:-")
+                if city_line_pattern.match(previous_line) and not re.search(r"\d{5}", previous_line):
+                    return f"{previous_line}\n{street_line}"
+            return street_line
         return None
 
     def _extract_property_details(self, text: str, visit_details: dict[str, object] | None = None) -> dict[str, object]:
@@ -526,7 +585,6 @@ class LicitorAuctionAdapter:
             "descriptif",
         )
         # Pattern pour les références d'avocat (Me. Nom ou Me Nom) — évite de couper sur "même", "mise", etc.
-        avocat_pattern = re.compile(r"\bMe\.?\s+[A-Z][a-z]", re.IGNORECASE)
         phone_pattern = re.compile(r"\b0[1-9](?:[\s\.\-]?\d{2}){4}\b")
 
         for index, line in enumerate(lines):
@@ -542,7 +600,7 @@ class LicitorAuctionAdapter:
                 next_line = lines[next_index]
                 if any(keyword in next_line.lower() for keyword in stop_keywords):
                     break
-                if avocat_pattern.search(next_line) or phone_pattern.search(next_line):
+                if self._is_lawyer_line(next_line) or phone_pattern.search(next_line):
                     break
                 block_lines.append(next_line)
                 if len(next_line) > 180:
@@ -564,6 +622,14 @@ class LicitorAuctionAdapter:
                 "adjudication",
                 "enchere",
                 "enchère",
-                "avocat",
             ]
-        ) or bool(re.search(r"\bMe\.\s+[A-Z]", line)) or bool(re.search(r"\b0[1-9](?:[\s\.-]?\d{2}){4}\b", line))
+        ) or self._is_lawyer_line(line) or bool(re.search(r"\b0[1-9](?:[\s\.-]?\d{2}){4}\b", line))
+
+    def _is_lawyer_line(self, line: str) -> bool:
+        lowered = line.lower()
+        return bool(
+            re.search(r"\bme\.?\s+[A-ZÀ-ÿ][a-zà-ÿ]", line)
+            or re.search(r"\bma[iî]tre\s+[A-ZÀ-ÿ][a-zà-ÿ]", line)
+            or " avocat" in lowered
+            or lowered.startswith("avocat")
+        )

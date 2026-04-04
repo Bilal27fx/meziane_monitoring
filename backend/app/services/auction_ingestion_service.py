@@ -29,6 +29,13 @@ from app.services.telegram_notification_service import (
 )
 
 
+def _is_unknown_placeholder(value: str | None) -> bool:
+    if value is None:
+        return True
+    normalized = value.strip().lower()
+    return normalized in {"", "inconnu", "tj inconnu"}
+
+
 def build_source_adapter(source_code: str) -> SourceAdapter:
     if source_code == "licitor":
         return LicitorAuctionAdapter()
@@ -260,6 +267,24 @@ class AuctionIngestionService:
         listing.occupancy_status = facts.get("occupancy_status") or listing.occupancy_status
         if facts.get("visit_dates"):
             listing.visit_dates = facts["visit_dates"]
+        if listing.city is None and listing.address:
+            address_lines = [line.strip() for line in str(listing.address).splitlines() if line.strip()]
+            if address_lines:
+                listing.city = address_lines[0]
+        if listing.session and facts.get("auction_date"):
+            current_session_datetime = listing.session.session_datetime
+            detail_auction_date = facts["auction_date"]
+            should_replace_datetime = (
+                current_session_datetime is None
+                or current_session_datetime != detail_auction_date
+            )
+            if should_replace_datetime:
+                listing.session.session_datetime = detail_auction_date
+        if listing.session and facts.get("auction_tribunal"):
+            if _is_unknown_placeholder(listing.session.tribunal) or listing.session.tribunal != facts["auction_tribunal"]:
+                listing.session.tribunal = facts["auction_tribunal"]
+        if listing.session and listing.city and _is_unknown_placeholder(listing.session.city):
+            listing.session.city = listing.city
         listing.status = AuctionListingStatus.NORMALIZED
         listing.last_seen_at = datetime.utcnow()
 

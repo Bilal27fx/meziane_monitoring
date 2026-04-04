@@ -142,6 +142,34 @@ def test_parse_listing_cards_extracts_detail_urls_and_basic_facts():
     assert listings[0].postal_code == "75017"
 
 
+def test_parse_listing_cards_extracts_non_paris_city_from_card_text():
+    html = """
+    <html>
+      <body>
+        <a href="/annonce/108033.html">
+          Un appartement - Mise a prix 60 000 EUR - 25,57 m² - Villeneuve-Saint-Georges 94190
+        </a>
+      </body>
+    </html>
+    """
+
+    adapter = LicitorAuctionAdapter()
+    session = RawSession(
+        external_id="tj-creteil-2026-04-16-0930",
+        tribunal="TJ Créteil",
+        city="Créteil",
+        session_datetime=datetime(2026, 4, 16, 9, 30),
+        source_url="https://www.licitor.com/ventes-judiciaires-immobilieres/creteil/vente.html",
+        announced_listing_count=1,
+    )
+
+    listings = adapter.parse_listing_cards(html, session.source_url, session)
+
+    assert len(listings) == 1
+    assert listings[0].city == "Villeneuve-Saint-Georges"
+    assert listings[0].postal_code == "94190"
+
+
 def test_parse_listing_detail_extracts_documents_and_contact_facts():
     html = """
     <html>
@@ -368,6 +396,111 @@ def test_parse_listing_detail_does_not_confuse_visit_address_with_property_addre
 
     assert detail.facts["address"] == "22 rue des Rosiers, 93400 Saint-Ouen-sur-Seine"
     assert detail.facts["property_details"]["visit"]["location"] == "88 avenue Michelet, 93400 Saint-Ouen-sur-Seine"
+
+
+def test_parse_listing_detail_extracts_real_page_without_using_lawyer_address():
+    html = """
+    <html>
+      <body>
+        <h1>Tribunal Judiciaire de Paris</h1>
+        <p>Vente aux enchères publiques en un lot</p>
+        <p>jeudi 7 mai 2026 à 14h</p>
+        <p>UN APPARTEMENT</p>
+        <p>de 55 m² (Loi Carrez), au rez-de-chaussée, de deux pièces principales</p>
+        <p>Une cave</p>
+        <p>Inoccupé</p>
+        <p>Mise à prix : 140 000 €</p>
+        <p>(Outre les charges)</p>
+        <p>Consignation pour enchérir : chèque de banque à l'ordre de M. le Bâtonnier Séquestre représentant 10% du montant de la mise à prix</p>
+        <p>Paris 16ème</p>
+        <p>22, square de l'Alboni</p>
+        <p>Afficher le plan</p>
+        <p>(exactitude non garantie)</p>
+        <p>Visite sur place lundi 27 avril 2026 de 12h à 13h</p>
+        <p>Maître Florence Renault, Avocat</p>
+        <p>22, rue Breguet - 75011 Paris</p>
+        <p>Tél.: 01 42 21 06 01</p>
+      </body>
+    </html>
+    """
+
+    adapter = LicitorAuctionAdapter()
+    session = adapter.parse_sessions(
+        html,
+        "https://www.licitor.com/ventes-judiciaires-immobilieres/paris/vente.html",
+    )[0]
+    listing = adapter.parse_listing_cards(
+        """
+        <a href="/annonce/67128.html">
+          Un appartement - Mise a prix 140 000 EUR - 55,00 m² - Paris 16eme 75016
+        </a>
+        """,
+        session.source_url,
+        session,
+    )[0]
+
+    detail = adapter.parse_listing_detail(
+        html,
+        "https://www.licitor.com/annonce/67128.html",
+        listing,
+    )
+
+    assert session.tribunal == "TJ Paris"
+    assert session.session_datetime == datetime(2026, 5, 7, 14, 0)
+    assert detail.facts["nb_pieces"] == 2
+    assert detail.facts["address"] == "Paris 16ème\n22, square de l'Alboni"
+    assert detail.facts["visit_dates"] == ["lundi 27 avril 2026 de 12h à 13h"]
+    assert detail.facts["property_details"]["visit"]["location"] == "Paris 16ème\n22, square de l'Alboni"
+    assert "Breguet" not in detail.facts["address"]
+
+
+def test_parse_listing_detail_keeps_visit_hour_and_does_not_take_lawyer_postal_code():
+    html = """
+    <html>
+      <body>
+        <h1>Tribunal Judiciaire de Paris</h1>
+        <p>Vente aux enchères publiques en un lot de vente</p>
+        <p>jeudi 21 mai 2026 à 14h</p>
+        <p>UN STUDIO</p>
+        <p>de 12,46 m², au rez-de-chaussée</p>
+        <p>Le bien est loué</p>
+        <p>Mise à prix : 40 000 €</p>
+        <p>Paris 18ème</p>
+        <p>10, impasse du Curé</p>
+        <p>Afficher le plan</p>
+        <p>(exactitude non garantie)</p>
+        <p>Visite sur place lundi 11 mai 2026 à 14h</p>
+        <p>Maître Éric Assouline, du Cabinet Ethic All, Avocat</p>
+        <p>15, bd Richard Lenoir - 75011 Paris</p>
+      </body>
+    </html>
+    """
+
+    adapter = LicitorAuctionAdapter()
+    session = adapter.parse_sessions(
+        html,
+        "https://www.licitor.com/ventes-judiciaires-immobilieres/paris/vente.html",
+    )[0]
+    listing = adapter.parse_listing_cards(
+        """
+        <a href="/annonce/108146.html">
+          Annonce n°108146 : un studio à Paris 18eme, mise a prix : 40 000 EUR - 12,46 m² - Paris 18eme 75018
+        </a>
+        """,
+        session.source_url,
+        session,
+    )[0]
+
+    detail = adapter.parse_listing_detail(
+        html,
+        "https://www.licitor.com/annonce/108146.html",
+        listing,
+    )
+
+    assert detail.facts["address"] == "Paris 18ème\n10, impasse du Curé"
+    assert detail.facts["postal_code"] == "75018"
+    assert detail.facts["visit_dates"] == ["lundi 11 mai 2026 à 14h"]
+    assert detail.facts["property_details"]["visit"]["location"] == "Paris 18ème\n10, impasse du Curé"
 
 
 # ── Nouveaux cas — bugs fixés ──────────────────────────────────────────────

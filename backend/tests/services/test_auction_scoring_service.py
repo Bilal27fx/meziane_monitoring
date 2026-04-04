@@ -1,5 +1,14 @@
+from copy import deepcopy
+
 from app.models.auction_listing import AuctionListing
-from app.services.auction_scoring_service import AuctionLLMUnavailableError, AuctionQualitativeSignals, score_listing
+from app.services.auction_scoring_service import (
+    AuctionLLMUnavailableError,
+    AuctionQualitativeSignals,
+    _build_prompt,
+    _categorie_investissement,
+    _scoring_config,
+    score_listing,
+)
 
 
 def _build_listing(**overrides):
@@ -96,3 +105,27 @@ def test_score_listing_returns_false_when_llm_unavailable(monkeypatch, db_sessio
 
     assert scored is False
     assert listing.score_global is None
+
+
+def test_category_thresholds_can_be_changed_via_json_config(monkeypatch):
+    custom_config = deepcopy(_scoring_config())
+    custom_config["scoring"]["category_thresholds"] = {
+        "opportunite_rare": 95,
+        "prioritaire": 80,
+        "a_etudier": 60,
+    }
+    monkeypatch.setattr("app.services.auction_scoring_service._scoring_config", lambda: custom_config)
+
+    assert _categorie_investissement(85) == "prioritaire"
+    assert _categorie_investissement(79) == "a_etudier"
+
+
+def test_build_prompt_uses_json_template(monkeypatch):
+    custom_config = deepcopy(_scoring_config())
+    custom_config["llm"]["user_prompt_template"] = "Titre={title}|Ville={city}|URL={source_url}|Target={strategy_target}"
+    custom_config["scoring"]["strategy_target"] = "test-target"
+    monkeypatch.setattr("app.services.auction_scoring_service._scoring_config", lambda: custom_config)
+
+    prompt = _build_prompt(_build_listing())
+
+    assert prompt == "Titre=Studio Paris 11eme|Ville=Paris 11eme|URL=https://example.com/listing/1|Target=test-target"
