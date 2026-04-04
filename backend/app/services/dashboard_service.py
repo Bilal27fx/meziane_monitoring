@@ -6,7 +6,7 @@ Service métier pour agréger toutes les données du dashboard Bloomberg.
 Calcule KPI, cashflow, patrimoine, alertes, top biens, vue SCI, etc.
 
 Dépendances:
-- models (SCI, Bien, Transaction, Locataire, Bail, Quittance, Opportunite)
+- models (SCI, Bien, Transaction, Locataire, Bail, Quittance)
 - services.cashflow_service
 - SQLAlchemy Session
 
@@ -26,7 +26,6 @@ from app.models.transaction import Transaction, TransactionCategorie
 from app.models.locataire import Locataire
 from app.models.bail import Bail, StatutBail
 from app.models.quittance import Quittance, StatutQuittance
-from app.models.opportunite import Opportunite, StatutOpportunite
 from app.services.cashflow_service import CashflowService
 
 
@@ -128,17 +127,13 @@ class DashboardService:
         }
 
     def _count_alertes(self) -> int:
-        """Compte les alertes actives — 1 requête UNION au lieu de 2 (RFC-007)"""
-        from sqlalchemy import union_all, literal, select as sa_select
+        """Compte les alertes actives disponibles sans module agent."""
+        from sqlalchemy import select as sa_select
 
-        q_impayes = sa_select(literal(1)).where(
-            Quittance.statut.in_([StatutQuittance.IMPAYE, StatutQuittance.PARTIEL])
-        )
-        q_opps = sa_select(literal(1)).where(
-            Opportunite.statut == StatutOpportunite.NOUVEAU
-        )
         total = self.db.execute(
-            sa_select(func.count()).select_from(union_all(q_impayes, q_opps).subquery())
+            sa_select(func.count()).select_from(Quittance).where(
+                Quittance.statut.in_([StatutQuittance.IMPAYE, StatutQuittance.PARTIEL])
+            )
         ).scalar() or 0
         return total
 
@@ -446,42 +441,9 @@ class DashboardService:
             })
         return result
 
-    # === OPPORTUNITÉS IA ===
-
     def get_opportunites_overview(self, limit: int = 10) -> List[Dict]:
-        """Top opportunités détectées par agent IA"""
-
-        opportunites = self.db.query(Opportunite).filter(
-            Opportunite.statut.in_([
-                StatutOpportunite.NOUVEAU,
-                StatutOpportunite.VU
-            ])
-        ).order_by(
-            desc(Opportunite.score_global),
-            desc(Opportunite.date_detection)
-        ).limit(limit).all()
-
-        result = []
-
-        for opp in opportunites:
-            result.append({
-                "id": opp.id,
-                "titre": opp.titre,
-                "ville": opp.ville,
-                "prix": float(opp.prix),
-                "surface": float(opp.surface) if opp.surface else None,
-                "prix_m2": float(opp.prix_m2) if opp.prix_m2 else None,
-                "nb_pieces": opp.nb_pieces,
-                "score_global": opp.score_global,
-                "rentabilite_brute": float(opp.rentabilite_brute) if opp.rentabilite_brute else None,
-                "rentabilite_nette": float(opp.rentabilite_nette) if opp.rentabilite_nette else None,
-                "source": opp.source.value,
-                "url_annonce": opp.url_annonce,
-                "date_detection": opp.date_detection.isoformat(),
-                "statut": opp.statut.value
-            })
-
-        return result
+        """Le module agent ayant été retiré, le dashboard renvoie une liste vide."""
+        return []
 
     # === DASHBOARD COMPLET ===
 

@@ -19,9 +19,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from app.config import settings
 from app.utils.logger import setup_logger
-from app.api import sci_routes, bien_routes, transaction_routes, banking_routes, cashflow_routes, opportunite_routes, locataire_routes, locataire_paiement_routes, document_routes, dashboard_routes, quittance_routes
+from app.api import sci_routes, bien_routes, transaction_routes, banking_routes, cashflow_routes, locataire_routes, locataire_paiement_routes, document_routes, dashboard_routes, quittance_routes
 from app.api import auth_routes, user_routes
-from app.api import auction_source_routes, auction_listing_routes, auction_agent_routes
 
 from app.models import load_all_models
 
@@ -73,14 +72,10 @@ app.include_router(bien_routes.router)       # Routes Biens
 app.include_router(transaction_routes.router)  # Routes Transactions
 app.include_router(banking_routes.router)    # Routes Banking
 app.include_router(cashflow_routes.router)   # Routes Cashflow
-app.include_router(opportunite_routes.router)  # Routes Opportunités
 app.include_router(locataire_routes.router)  # Routes Locataires
 app.include_router(locataire_paiement_routes.router)  # Routes Paiements locataires
 app.include_router(document_routes.router)   # Routes Documents
 app.include_router(quittance_routes.router)  # Routes Quittances
-app.include_router(auction_source_routes.router)  # Routes Sources auctions
-app.include_router(auction_listing_routes.router)  # Routes Data auctions
-app.include_router(auction_agent_routes.router)  # Routes Pilotage agents auctions
 
 
 @app.get("/")

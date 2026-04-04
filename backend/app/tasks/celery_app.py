@@ -12,8 +12,6 @@ Dépendances:
 
 Utilisé par:
 - tasks/banking_tasks.py
-- tasks/agent_tasks.py
-- tasks/auction_tasks.py
 - tasks/quittance_tasks.py
 """
 
@@ -30,8 +28,6 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=[
         "app.tasks.banking_tasks",
-        "app.tasks.agent_tasks",
-        "app.tasks.auction_tasks",
         "app.tasks.quittance_tasks",
     ]
 )
@@ -44,11 +40,6 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     beat_schedule={
-        # RFC-008: crontab() au lieu de cron string — compatible Celery standard
-        "run-prospection-agent-daily": {
-            "task": "app.tasks.agent_tasks.run_prospection_agent_task",
-            "schedule": crontab(hour=6, minute=0),
-        },
         "generate-quittances-monthly": {
             "task": "app.tasks.quittance_tasks.generate_quittances_task",
             "schedule": crontab(hour=8, minute=0, day_of_month=1),

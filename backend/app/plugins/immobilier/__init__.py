@@ -18,8 +18,6 @@ from app.plugins.base import BusinessModule
 from app.models.sci import SCI
 from app.models.bien import Bien, StatutBien
 from app.models.bail import Bail, StatutBail
-from app.models.transaction import Transaction
-from app.models.opportunite import Opportunite, StatutOpportunite
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -43,10 +41,6 @@ class ImmobilierPlugin(BusinessModule):
         valeur_totale = db.query(func.sum(Bien.valeur_actuelle)).filter(Bien.valeur_actuelle.isnot(None)).scalar() or 0
         nb_sci = db.query(func.count(SCI.id)).scalar() or 0
         nb_locataires = db.query(func.count(Bail.id)).filter(Bail.statut == StatutBail.ACTIF).scalar() or 0
-        nb_opportunites_nouvelles = db.query(func.count(Opportunite.id)).filter(
-            Opportunite.statut == StatutOpportunite.NOUVEAU
-        ).scalar() or 0
-
         return {
             "nb_sci": nb_sci,
             "nb_biens": nb_biens,
@@ -54,7 +48,7 @@ class ImmobilierPlugin(BusinessModule):
             "taux_occupation": round(nb_biens_loues / nb_biens * 100, 1) if nb_biens > 0 else 0,
             "valeur_patrimoniale": float(valeur_totale),
             "nb_locataires_actifs": nb_locataires,
-            "nb_opportunites_nouvelles": nb_opportunites_nouvelles,
+            "nb_opportunites_nouvelles": 0,
         }
 
     def on_startup(self) -> None:

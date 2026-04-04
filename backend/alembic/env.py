@@ -18,26 +18,9 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from app.utils.db import Base
 from app.config import settings
+from app.models import load_all_models
 
-# Import tous les modèles pour autogenerate
-from app.models.sci import SCI
-from app.models.bien import Bien
-from app.models.transaction import Transaction
-from app.models.locataire import Locataire
-from app.models.bail import Bail
-from app.models.quittance import Quittance
-from app.models.document import Document
-from app.models.document_folder import DocumentFolder
-from app.models.document_extraction import DocumentExtraction
-from app.models.opportunite import Opportunite
-from app.models.simulation import Simulation
-from app.models.user import User
-from app.models.auction_source import AuctionSource
-from app.models.auction_session import AuctionSession
-from app.models.auction_listing import AuctionListing
-from app.models.agent_definition import AgentDefinition
-from app.models.agent_parameter_set import AgentParameterSet
-from app.models.agent_run import AgentRun
+load_all_models()
 
 config = context.config
 

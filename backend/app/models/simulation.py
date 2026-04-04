@@ -5,15 +5,11 @@ Description:
 Représente simulation d'achat immobilier avec calculs financiers.
 Paramètres input, résultats calculs, recommandation IA.
 
-Dépendances:
-- opportunite.py (clé étrangère optionnelle)
-- utils.db.Base
-
 Utilisé par:
 - acquisition_service.py
 """
 
-from sqlalchemy import Column, Integer, String, Date, ForeignKey, Enum, JSON
+from sqlalchemy import Column, Integer, String, Date, Enum, JSON
 from app.utils.db import Base
 from datetime import datetime
 import enum
@@ -31,7 +27,6 @@ class Simulation(Base):  # Représente simulation acquisition immobilière
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String(100), nullable=True)
-    opportunite_id = Column(Integer, ForeignKey("opportunites_immobilieres.id"), nullable=True)
 
     # Dates
     date_simulation = Column(Date, nullable=False, default=datetime.utcnow)

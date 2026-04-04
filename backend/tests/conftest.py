@@ -17,16 +17,8 @@ from app.models import (  # noqa: F401
     document,
     document_folder,
     document_extraction,
-    opportunite,
     simulation,
     user,
-    auction_source,
-    auction_session,
-    auction_listing,
-    agent_definition,
-    agent_parameter_set,
-    agent_run,
-    agent_run_event,
 )
 
 

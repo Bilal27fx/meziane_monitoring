@@ -195,25 +195,6 @@ export interface DocumentLibrary {
   documents: Document[]
 }
 
-export interface Opportunite {
-  id: number
-  adresse: string
-  ville: string
-  prix: number
-  surface?: number
-  nb_pieces?: number
-  dpe?: string
-  tri_estime?: number
-  score: number
-  statut: 'nouveau' | 'vu' | 'analyse' | 'rejete' | 'favori'
-  source?: string
-  url?: string
-  analyse_ia?: string
-  risques?: string[]
-  created_at: string
-  updated_at: string
-}
-
 export interface User {
   id: number
   email: string
@@ -316,118 +297,6 @@ export interface ServicesHealth {
   celery: 'online' | 'offline'
 }
 
-// ─── Agent / Task ────────────────────────────────────────────────────────────
-
-export interface CeleryTask {
-  id: string
-  name: string
-  statut: 'ok' | 'warning' | 'error' | 'running' | 'pending'
-  derniere_exec?: string
-  prochaine_exec?: string
-  tasks_24h?: number
-  succes?: number
-  erreurs?: number
-  en_attente?: number
-}
-
-export interface AgentConfig {
-  villes_cibles: string[]
-  budget_max: number
-  tri_minimum: number
-  sources: string[]
-}
-
-export interface AuctionAgentRun {
-  id: number
-  agent_definition_id: number
-  parameter_set_id?: number | null
-  trigger_type: 'manual' | 'scheduled' | 'backfill'
-  status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
-  parameter_snapshot: Record<string, unknown>
-  prompt_snapshot?: Record<string, unknown> | null
-  code_version?: string | null
-  started_at: string
-  finished_at?: string | null
-  created_at: string
-}
-
-export interface AuctionAgentRunEvent {
-  id: number
-  run_id: number
-  level: 'debug' | 'info' | 'warning' | 'error'
-  step?: string | null
-  event_type: string
-  message: string
-  payload?: Record<string, unknown> | null
-  created_at: string
-}
-
-export interface AuctionListing {
-  id: number
-  source_id: number
-  session_id: number
-  external_id?: string | null
-  source_url: string
-  reference_annonce?: string | null
-  title: string
-  listing_type?: string | null
-  reserve_price?: number | null
-  city?: string | null
-  postal_code?: string | null
-  address?: string | null
-  surface_m2?: number | null
-  nb_pieces?: number | null
-  nb_chambres?: number | null
-  etage?: number | null
-  type_etage?: string | null
-  ascenseur?: boolean | null
-  balcon?: boolean | null
-  terrasse?: boolean | null
-  cave?: boolean | null
-  parking?: boolean | null
-  box?: boolean | null
-  jardin?: boolean | null
-  property_details?: Record<string, unknown> | null
-  occupancy_status?: string | null
-  visit_dates?: string[] | null
-  auction_date?: string | null
-  auction_tribunal?: string | null
-  auction_location?: string | null
-  visit_location?: string | null
-  status: 'discovered' | 'normalized' | 'enriched' | 'shortlisted' | 'rejected'
-  published_at?: string | null
-  last_seen_at: string
-  created_at: string
-  updated_at: string
-  // Scoring LLM
-  score_global?: number | null
-  score_localisation?: number | null
-  score_prix?: number | null
-  score_potentiel?: number | null
-  score_cible_paris_petite_surface?: number | null
-  score_liquidite?: number | null
-  score_occupation?: number | null
-  score_qualite_bien?: number | null
-  bonus_strategique?: number | null
-  categorie_investissement?: string | null
-  loyer_estime?: number | null
-  rentabilite_brute?: number | null
-  travaux_estimes?: number | null
-  valeur_marche_estimee?: number | null
-  valeur_marche_ajustee?: number | null
-  prix_max_cible?: number | null
-  prix_max_agressif?: number | null
-  raison_score?: string | null
-  risques_llm?: string[] | null
-  recommandation?: 'fort_potentiel' | 'a_surveiller' | 'rejeter' | null
-  scored_at?: string | null
-}
-
-export interface AuctionQuickLaunchPayload {
-  audience_urls?: string[]
-  auto_dispatch?: boolean
-}
-
 // ─── API Response Shapes ─────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {
@@ -493,13 +362,6 @@ export interface TransactionParams {
   type?: string
   date_debut?: string
   date_fin?: string
-}
-
-export interface OpportuniteParams {
-  page?: number
-  per_page?: number
-  statut?: string
-  score_min?: number
 }
 
 // ─── Form Data ────────────────────────────────────────────────────────────────
