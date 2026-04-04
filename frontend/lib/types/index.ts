@@ -87,6 +87,8 @@ export interface Quittance {
   locataire_id: number
   mois: string
   montant: number
+  montant_loyer: number
+  montant_charges: number
   statut: 'payee' | 'en_attente' | 'impayee'
   date_paiement?: string
   created_at: string
@@ -389,6 +391,9 @@ export interface AuctionListing {
   occupancy_status?: string | null
   visit_dates?: string[] | null
   auction_date?: string | null
+  auction_tribunal?: string | null
+  auction_location?: string | null
+  visit_location?: string | null
   status: 'discovered' | 'normalized' | 'enriched' | 'shortlisted' | 'rejected'
   published_at?: string | null
   last_seen_at: string
@@ -399,8 +404,19 @@ export interface AuctionListing {
   score_localisation?: number | null
   score_prix?: number | null
   score_potentiel?: number | null
+  score_cible_paris_petite_surface?: number | null
+  score_liquidite?: number | null
+  score_occupation?: number | null
+  score_qualite_bien?: number | null
+  bonus_strategique?: number | null
+  categorie_investissement?: string | null
   loyer_estime?: number | null
   rentabilite_brute?: number | null
+  travaux_estimes?: number | null
+  valeur_marche_estimee?: number | null
+  valeur_marche_ajustee?: number | null
+  prix_max_cible?: number | null
+  prix_max_agressif?: number | null
   raison_score?: string | null
   risques_llm?: string[] | null
   recommandation?: 'fort_potentiel' | 'a_surveiller' | 'rejeter' | null

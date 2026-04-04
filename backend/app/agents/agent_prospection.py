@@ -3,12 +3,12 @@ agent_prospection.py - Agent prospection immobilière automatique
 
 Description:
 Agent IA autonome qui scrape SeLoger, PAP, LeBonCoin quotidiennement.
-Analyse annonces avec GPT-4, score opportunités, notifie WhatsApp.
+Analyse annonces avec GPT-4, score opportunités, notifie Telegram.
 
 Dépendances:
 - playwright (scraping)
 - openai (scoring IA)
-- twilio (WhatsApp)
+- Telegram Bot API
 - models.opportunite
 
 Utilisé par:
@@ -18,9 +18,11 @@ Utilisé par:
 
 import asyncio
 import json
+import os
 import re
 from typing import List, Dict, Optional
 from datetime import datetime
+import httpx
 from playwright.async_api import async_playwright, Page
 from openai import OpenAI
 from sqlalchemy.orm import Session
@@ -306,7 +308,7 @@ Réponds UNIQUEMENT en JSON:
 
                         # Notifie si score élevé
                         if scoring.get("score_global", 0) >= self.criteres["score_min_notification"]:
-                            self.notifier_whatsapp(opportunite)
+                            self.notifier_telegram(opportunite)
                             resultats["notifications_envoyees"] += 1
 
             except Exception as e:
@@ -316,10 +318,8 @@ Réponds UNIQUEMENT en JSON:
         logger.info(f"✅ Agent terminé: {resultats}")
         return resultats
 
-    def notifier_whatsapp(self, opportunite: Opportunite):  # Envoie notification WhatsApp via Twilio
-        logger.info(f"📱 Envoi notification WhatsApp pour opportunité {opportunite.id}")
-
-        message = f"""🚨 Nouvelle opportunité détectée !
+    def _build_notification_message(self, opportunite: Opportunite) -> str:
+        return f"""🚨 Nouvelle opportunité détectée !
 
 📍 {opportunite.ville}
 💰 Prix: {opportunite.prix:,.0f}€
@@ -335,23 +335,29 @@ Réponds UNIQUEMENT en JSON:
 🔗 {opportunite.url_annonce}
 """
 
-        # Envoie via Twilio
-        if settings.TWILIO_ACCOUNT_SID and settings.TWILIO_AUTH_TOKEN:
+    def notifier_telegram(self, opportunite: Opportunite):
+        logger.info(f"📱 Envoi notification Telegram pour opportunité {opportunite.id}")
+
+        message = self._build_notification_message(opportunite)
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+        if bot_token and chat_id:
             try:
-                from twilio.rest import Client
-
-                client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-
-                message_sent = client.messages.create(
-                    from_=f"whatsapp:{settings.TWILIO_WHATSAPP_FROM}",
-                    to=f"whatsapp:{settings.TWILIO_WHATSAPP_TO}",
-                    body=message
+                response = httpx.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={
+                        "chat_id": chat_id,
+                        "text": message,
+                        "disable_web_page_preview": False,
+                    },
+                    timeout=10.0,
                 )
-
-                logger.info(f"✅ WhatsApp envoyé: {message_sent.sid}")
+                response.raise_for_status()
+                logger.info("✅ Telegram envoyé")
 
             except Exception as e:
-                logger.error(f"Erreur envoi WhatsApp: {e}")
+                logger.error(f"Erreur envoi Telegram: {e}")
         else:
-            logger.warning("Credentials Twilio manquantes, notification non envoyée")
+            logger.warning("Variables Telegram manquantes, notification non envoyée")
             logger.info(f"Message preview:\n{message}")

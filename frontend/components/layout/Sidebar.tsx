@@ -32,14 +32,23 @@ export default function Sidebar() {
   }, [menuOpen])
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-12 z-20 bg-[#0d0d0d] border-r border-[#262626] flex flex-col items-center">
+    <aside
+      className="fixed left-0 top-0 h-screen w-12 z-20 flex flex-col items-center"
+      style={{
+        backgroundColor: 'var(--t-bg-overlay)',
+        borderRight: '1px solid var(--t-border)',
+      }}
+    >
       {/* Logo → Dashboard */}
       <Link
         href="/dashboard"
-        className="h-14 flex items-center justify-center w-full border-b border-[#262626] hover:bg-[#1a1a1a] transition-colors"
+        className="h-14 flex items-center justify-center w-full transition-colors"
+        style={{ borderBottom: '1px solid var(--t-border)' }}
         title="Dashboard"
+        onMouseEnter={e => (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--t-bg-hover)'}
+        onMouseLeave={e => (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'transparent'}
       >
-        <span className="text-sm font-bold text-white">M</span>
+        <span className="text-sm font-bold" style={{ color: 'var(--t-text)' }}>M</span>
       </Link>
 
       {/* Nav */}
@@ -51,12 +60,23 @@ export default function Sidebar() {
               key={href}
               href={href}
               title={label}
-              className={cn(
-                'w-10 h-10 mx-auto rounded-md flex items-center justify-center transition-colors',
-                isActive
-                  ? 'bg-[#262626] text-white'
-                  : 'text-[#525252] hover:text-white hover:bg-[#1a1a1a]'
-              )}
+              className="w-10 h-10 mx-auto rounded-md flex items-center justify-center transition-colors"
+              style={{
+                backgroundColor: isActive ? 'var(--t-bg-active)' : 'transparent',
+                color: isActive ? 'var(--t-text)' : 'var(--t-text-faint)',
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'var(--t-bg-hover)'
+                  ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--t-text)'
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLAnchorElement).style.backgroundColor = 'transparent'
+                  ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--t-text-faint)'
+                }
+              }}
             >
               <Icon className="h-4 w-4" />
             </Link>
@@ -69,16 +89,28 @@ export default function Sidebar() {
         <button
           onClick={() => setMenuOpen((v) => !v)}
           title="Mon compte"
-          className="w-7 h-7 rounded-full bg-[#262626] hover:bg-[#333333] flex items-center justify-center transition-colors"
+          className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+          style={{ backgroundColor: 'var(--t-bg-active)' }}
+          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--t-bg-button)'}
+          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--t-bg-active)'}
         >
-          <span className="text-xs font-medium text-white">B</span>
+          <span className="text-xs font-medium" style={{ color: 'var(--t-text)' }}>B</span>
         </button>
 
         {menuOpen && (
-          <div className="absolute bottom-10 left-0 w-36 bg-[#111111] border border-[#262626] rounded-md shadow-lg overflow-hidden">
+          <div
+            className="absolute bottom-10 left-0 w-36 rounded-md shadow-lg overflow-hidden"
+            style={{
+              backgroundColor: 'var(--t-bg-card)',
+              border: '1px solid var(--t-border)',
+            }}
+          >
             <button
               onClick={() => { setMenuOpen(false); logout() }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[#ef4444] hover:bg-[#1a1a1a] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors"
+              style={{ color: '#ef4444' }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--t-bg-hover)'}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'}
             >
               <LogOut className="h-3 w-3" />
               Se déconnecter

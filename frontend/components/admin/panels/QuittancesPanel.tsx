@@ -144,9 +144,14 @@ export default function QuittancesPanel({ open, onClose, locataireNom, locataire
                       <span className="text-xs text-white capitalize">{q.mois}</span>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="text-xs font-mono text-white tabular-nums">
-                        {formatCurrency(q.montant)}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-mono text-white tabular-nums">
+                          {formatCurrency(q.montant)}
+                        </span>
+                        <span className="text-[10px] text-[#737373]">
+                          {formatCurrency(q.montant_loyer)} + {formatCurrency(q.montant_charges)}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-3 py-2.5">
                       <Badge variant={statutVariant(q.statut)} dot>

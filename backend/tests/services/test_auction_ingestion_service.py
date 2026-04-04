@@ -63,7 +63,7 @@ def _build_run(db_session, source_code: str = "licitor"):
                             <p>Appartement de 4 pieces avec 2 chambres au 3eme etage avec ascenseur, balcon et cave</p>
                             <p>Bien occupe</p>
                             <p>Adresse : 12 rue de Tocqueville, 75017 Paris</p>
-                            <p>Visites : mardi 10 mars 2026 de 14h a 15h</p>
+                            <p>Visites : mardi 10 mars 2026 de 14h a 15h au 12 rue de Tocqueville, 75017 Paris</p>
                             <a href="/pdf/ccv.pdf">CCV</a>
                           </body>
                         </html>
@@ -79,7 +79,16 @@ def _build_run(db_session, source_code: str = "licitor"):
     return run
 
 
-def test_execute_auction_ingestion_run_persists_session_and_listing(db_session):
+def _stub_score_listing(listing, db):
+    listing.score_global = 80
+    listing.recommandation = "fort_potentiel"
+    listing.categorie_investissement = "prioritaire"
+    return True
+
+
+def test_execute_auction_ingestion_run_persists_session_and_listing(db_session, monkeypatch):
+    monkeypatch.setattr("app.services.auction_ingestion_service.score_listing", _stub_score_listing)
+    monkeypatch.setattr("app.services.auction_ingestion_service.send_auction_listing_notification", lambda listing: True)
     run = _build_run(db_session)
 
     result = execute_auction_ingestion_run(db_session, run.id)
@@ -90,6 +99,14 @@ def test_execute_auction_ingestion_run_persists_session_and_listing(db_session):
     assert result["sessions_created"] == 1
     assert result["listings_created"] == 1
     assert result["listings_normalized"] == 1
+    assert result["listings_scored"] == 1
+    assert result["notifications_sent"] == 1
+    assert result["data_quality"]["normalized_listings"] == 1
+    assert result["data_quality"]["complete_listings"] == 1
+    assert result["data_quality"]["missing_auction_date"] == 0
+    assert result["data_quality"]["missing_visit_dates"] == 0
+    assert result["data_quality"]["missing_visit_location"] == 0
+    assert result["data_quality"]["missing_address"] == 0
     assert listing.status == AuctionListingStatus.NORMALIZED
     assert listing.listing_type == "appartement"
     assert listing.address == "12 rue de Tocqueville, 75017 Paris"
@@ -108,9 +125,12 @@ def test_execute_auction_ingestion_run_persists_session_and_listing(db_session):
         "run_completed",
     ]
     assert events[-1].payload["listings_normalized"] == 1
+    assert events[-1].payload["data_quality"]["complete_listings"] == 1
 
 
-def test_execute_auction_ingestion_run_is_idempotent_for_existing_records(db_session):
+def test_execute_auction_ingestion_run_is_idempotent_for_existing_records(db_session, monkeypatch):
+    monkeypatch.setattr("app.services.auction_ingestion_service.score_listing", _stub_score_listing)
+    monkeypatch.setattr("app.services.auction_ingestion_service.send_auction_listing_notification", lambda listing: True)
     first_run = _build_run(db_session)
     execute_auction_ingestion_run(db_session, first_run.id)
 
@@ -158,7 +178,10 @@ def test_execute_auction_ingestion_run_is_idempotent_for_existing_records(db_ses
     assert result["sessions_updated"] == 1
     assert result["listings_created"] == 0
     assert result["listings_updated"] == 1
+    assert result["listings_scored"] == 1
+    assert result["notifications_sent"] == 0
     assert listings[0].reserve_price == 380000
+    assert listings[0].score_global is not None
 
 
 def test_execute_auction_ingestion_run_logs_failure(db_session):
@@ -180,6 +203,8 @@ def test_execute_auction_ingestion_run_logs_failure(db_session):
 
 
 def test_execute_auction_ingestion_run_fetches_session_urls_when_html_not_preloaded(db_session, monkeypatch):
+    monkeypatch.setattr("app.services.auction_ingestion_service.score_listing", _stub_score_listing)
+    monkeypatch.setattr("app.services.auction_ingestion_service.send_auction_listing_notification", lambda listing: True)
     run = _build_run(db_session)
     run.parameter_snapshot = {
         "source_code": "licitor",
@@ -229,3 +254,13 @@ def test_execute_auction_ingestion_run_fetches_session_urls_when_html_not_preloa
     events = db_session.query(AgentRunEvent).filter(AgentRunEvent.run_id == run.id).order_by(AgentRunEvent.id.asc()).all()
     assert result["status"] == "success"
     assert [event.event_type for event in events[:2]] == ["fetch_started", "fetch_completed"]
+    assert result["data_quality"]["normalized_listings"] == 1
+    assert result["data_quality"]["complete_listings"] == 0
+    assert result["data_quality"]["missing_visit_dates"] == 1
+    assert result["data_quality"]["missing_visit_location"] == 1
+    assert result["data_quality"]["missing_address"] == 1
+    assert result["data_quality"]["incomplete_samples"][0]["missing_fields"] == [
+        "visit_dates",
+        "visit_location",
+        "address",
+    ]

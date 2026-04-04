@@ -7,6 +7,7 @@ import { Toaster } from 'react-hot-toast'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import { tokenStore } from '@/lib/api/client'
+import { ThemeProvider, useTheme } from '@/lib/context/ThemeContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,8 +18,9 @@ const queryClient = new QueryClient({
   },
 })
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const { theme } = useTheme()
 
   useEffect(() => {
     if (!tokenStore.getAccessToken() && !tokenStore.getRefreshToken()) {
@@ -26,9 +28,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [router])
 
+  const isDark = theme === 'dark'
+
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="h-screen bg-[#0a0a0a] overflow-hidden">
+      <div className="h-screen overflow-hidden" style={{ backgroundColor: 'var(--t-bg-base)' }}>
         <Sidebar />
         <Header />
         <main className="pl-12 pt-14 h-full overflow-y-auto">
@@ -39,13 +43,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         position="bottom-right"
         toastOptions={{
           style: {
-            background: '#111111',
-            border: '1px solid #262626',
-            color: '#fff',
+            background: isDark ? '#111111' : '#ffffff',
+            border: `1px solid ${isDark ? '#262626' : '#e0e0e0'}`,
+            color: isDark ? '#fff' : '#111111',
             fontSize: '12px',
           },
         }}
       />
     </QueryClientProvider>
+  )
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ThemeProvider>
+      <AppLayoutInner>{children}</AppLayoutInner>
+    </ThemeProvider>
   )
 }

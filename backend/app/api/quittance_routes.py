@@ -213,6 +213,16 @@ def _build_pdf_document(commands: list[str]) -> bytes:
 
 
 def _resolve_quittance_amounts(quittance: Quittance) -> tuple[float, float, float]:
+    if (
+        quittance.montant_loyer is not None
+        or quittance.montant_charges is not None
+        or quittance.montant_total is not None
+    ):
+        loyer = float(quittance.montant_loyer or 0)
+        charges = float(quittance.montant_charges or 0)
+        total = float(quittance.montant_total or (loyer + charges))
+        return loyer, charges, total
+
     bail = quittance.bail
     if bail:
         loyer = float(bail.loyer_mensuel or 0)

@@ -6,7 +6,8 @@ Endpoints de lecture pour audiences et annonces auctions.
 """
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy import case
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.auction_listing import AuctionListing
 from app.models.auction_session import AuctionSession
@@ -43,11 +44,21 @@ def list_auction_listings(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    query = db.query(AuctionListing)
+    query = db.query(AuctionListing).options(joinedload(AuctionListing.session))
     if source_id is not None:
         query = query.filter(AuctionListing.source_id == source_id)
     if session_id is not None:
         query = query.filter(AuctionListing.session_id == session_id)
     if status_filter is not None:
         query = query.filter(AuctionListing.status == status_filter)
-    return query.order_by(AuctionListing.last_seen_at.desc(), AuctionListing.id.desc()).limit(limit).offset(offset).all()
+    return (
+        query.order_by(
+            case((AuctionListing.score_global.is_(None), 1), else_=0).asc(),
+            AuctionListing.score_global.desc(),
+            AuctionListing.last_seen_at.desc(),
+            AuctionListing.id.desc(),
+        )
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )

@@ -439,7 +439,7 @@ class DashboardService:
                 "email": bail.locataire.email,
                 "telephone": bail.locataire.telephone,
                 "bien_adresse": bail.bien.adresse if bail.bien else None,
-                "loyer_mensuel": float(bail.loyer_mensuel),
+                "loyer_mensuel": float(bail.loyer_mensuel or 0) + float(bail.charges_mensuelles or 0),
                 "statut_paiement": derniere_q.statut.value if derniere_q else "en_attente",
                 "nb_impayes": impayes_map.get(bail.id, 0),
                 "date_debut_bail": bail.date_debut.isoformat(),
