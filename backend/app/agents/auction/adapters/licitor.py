@@ -2,12 +2,22 @@
 licitor.py - Adapter source Licitor
 
 Description:
-Implémente le parsing minimal Licitor pour audiences et annonces detail.
-Le fetch reseau sera branche plus tard sur ce parser testable.
+Parse les pages Licitor (sessions, listing cards, détail annonce).
+Le détail annonce utilise une extraction LLM-first : segmentation du texte brut
+puis appel OpenAI pour retourner un JSON structuré. Fallback regex si LLM indisponible.
+
+Dependances:
+- licitor_text_segmenter
+- licitor_llm_extraction_service
+- adapters/base
+
+Utilise par:
+- auction_ingestion_service.py
 """
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime
 from html import unescape
@@ -16,6 +26,14 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from app.agents.auction.adapters.base import RawListing, RawListingDetail, RawSession
+from app.agents.auction.licitor_llm_extraction_service import (
+    LicitorLLMUnavailableError,
+    LicitorPageExtraction,
+    extract_page,
+)
+from app.agents.auction.licitor_text_segmenter import segment_licitor_page
+
+logger = logging.getLogger(__name__)
 
 
 class LicitorAuctionAdapter:
@@ -103,15 +121,141 @@ class LicitorAuctionAdapter:
 
     def parse_listing_detail(self, html: str, page_url: str, listing: RawListing) -> RawListingDetail:
         soup = BeautifulSoup(html, "html.parser")
-        page_text = soup.get_text("\n", strip=True)
+        raw_text = soup.get_text("\n", strip=True)
+        documents = self._extract_documents(soup, page_url)
+
+        try:
+            sections = segment_licitor_page(raw_text)
+            extraction = extract_page(sections)
+            lot = self._match_lot(extraction, listing)
+            facts = self._map_extraction_to_facts(extraction, lot, page_url, listing)
+            facts["documents"] = documents
+            facts["llm_extraction"] = extraction.model_dump()
+            logger.info("LLM extraction ok pour %s (%d lot(s))", page_url, len(extraction.lots))
+        except LicitorLLMUnavailableError as exc:
+            logger.warning("LLM indisponible pour %s — fallback regex: %s", page_url, exc)
+            facts = self._extract_facts_regex(soup, raw_text, page_url, listing)
+            facts["documents"] = documents
+
+        return RawListingDetail(listing=listing, facts=facts)
+
+    def _match_lot(self, extraction: LicitorPageExtraction, listing: RawListing):
+        """Retourne le lot le plus proche du listing (par prix ou surface)."""
+        if not extraction.lots:
+            return None
+        if len(extraction.lots) == 1:
+            return extraction.lots[0]
+
+        # Matching par mise à prix
+        if listing.reserve_price:
+            for lot in extraction.lots:
+                if lot.mise_a_prix and abs(lot.mise_a_prix - listing.reserve_price) < 1000:
+                    return lot
+
+        # Matching par surface
+        if listing.surface_m2:
+            for lot in extraction.lots:
+                if lot.surface_m2 and abs(lot.surface_m2 - listing.surface_m2) < 2.0:
+                    return lot
+
+        return extraction.lots[0]
+
+    def _map_extraction_to_facts(
+        self,
+        extraction: LicitorPageExtraction,
+        lot,
+        page_url: str,
+        listing: RawListing,
+    ) -> dict:
+        """Traduit LicitorPageExtraction + lot vers le dict facts de _apply_listing_detail."""
+        amenities = lot.amenities if lot else {}
+        resolved_city = self._resolve_city(
+            extraction.city,
+            extraction.address,
+            extraction.postal_code,
+            listing.city,
+            page_url,
+        )
+
+        auction_date = None
+        if extraction.auction_date:
+            try:
+                from datetime import datetime as dt
+                time_str = extraction.auction_time or "00:00"
+                auction_date = dt.fromisoformat(f"{extraction.auction_date}T{time_str}:00")
+            except ValueError:
+                pass
+
+        address_parts = [
+            p for p in [
+                lot.description[:80] if lot and not extraction.address else None,
+                extraction.address,
+            ]
+            if p
+        ]
+        address = extraction.address
+
+        property_details: dict = {
+            "typology": lot.type_bien if lot else None,
+            "room_count": lot.nb_pieces if lot else None,
+            "bedroom_count": lot.nb_chambres if lot else None,
+            "floor": {"etage": lot.etage if lot else None, "type_etage": None},
+            "amenities": amenities,
+            "extras": lot.extras if lot else [],
+            "visit": {
+                "dates": extraction.visit_dates,
+                "location": extraction.visit_location,
+            },
+        }
+
+        return {
+            "title": self._first_non_empty(listing.title),
+            "reserve_price": (lot.mise_a_prix if lot else None) or listing.reserve_price,
+            "surface_m2": (lot.surface_m2 if lot else None) or listing.surface_m2,
+            "nb_pieces": lot.nb_pieces if lot else None,
+            "nb_chambres": lot.nb_chambres if lot else None,
+            "etage": lot.etage if lot else None,
+            "type_etage": None,
+            "ascenseur": amenities.get("ascenseur"),
+            "balcon": amenities.get("balcon"),
+            "terrasse": amenities.get("terrasse"),
+            "cave": amenities.get("cave"),
+            "parking": amenities.get("parking"),
+            "box": amenities.get("box"),
+            "jardin": amenities.get("jardin"),
+            "city": resolved_city,
+            "postal_code": extraction.postal_code or listing.postal_code,
+            "occupancy_status": extraction.occupancy_status,
+            "lawyer_phone": extraction.lawyer_phone,
+            "visit_dates": extraction.visit_dates,
+            "address": address,
+            "property_details": property_details,
+            "auction_date": auction_date,
+            "auction_tribunal": extraction.tribunal,
+        }
+
+    def _extract_facts_regex(
+        self,
+        soup: BeautifulSoup,
+        page_text: str,
+        page_url: str,
+        listing: RawListing,
+    ) -> dict:
+        """Fallback regex — logique originale conservée si LLM indisponible."""
         page_text_space = soup.get_text(" ", strip=True)
         floor_info = self._extract_floor_info(page_text)
         extracted_address = self._extract_address(page_text)
         visit_details = self._extract_visit_details(page_text, extracted_address)
         auction_date = self._extract_session_datetime(page_text_space, page_url)
         auction_tribunal = self._extract_tribunal(page_text_space, page_url)
-
-        facts = {
+        resolved_city = self._resolve_city(
+            None,
+            extracted_address,
+            self._extract_postal_code(extracted_address or "") or listing.postal_code or self._extract_postal_code(page_text),
+            listing.city,
+            page_url,
+        )
+        return {
             "title": self._first_non_empty(
                 self._text_of_first(soup, "h1"),
                 listing.title,
@@ -129,17 +273,16 @@ class LicitorAuctionAdapter:
             "parking": self._extract_amenity_presence(page_text, ["parking", "stationnement"], ["sans parking", "sans stationnement"]),
             "box": self._extract_amenity_presence(page_text, ["box", "garage"], ["sans box", "sans garage"]),
             "jardin": self._extract_amenity_presence(page_text, ["jardin"], ["sans jardin"]),
-            "postal_code": self._extract_postal_code(extracted_address or "") or listing.postal_code,
+            "city": resolved_city,
+            "postal_code": self._extract_postal_code(extracted_address or "") or listing.postal_code or self._extract_postal_code(page_text),
             "occupancy_status": self._extract_occupancy_status(page_text),
             "lawyer_phone": self._extract_phone(page_text),
-            "documents": self._extract_documents(soup, page_url),
             "visit_dates": visit_details["dates"],
             "address": extracted_address,
             "property_details": self._extract_property_details(page_text, visit_details),
             "auction_date": auction_date,
             "auction_tribunal": auction_tribunal,
         }
-        return RawListingDetail(listing=listing, facts=facts)
 
     def _extract_tribunal(self, text: str, page_url: str) -> str:
         slug_match = re.search(r"/(tj-[a-z0-9\-]+)/", page_url)
@@ -318,6 +461,47 @@ class LicitorAuctionAdapter:
             if city:
                 return city
         return fallback_city
+
+    def _resolve_city(
+        self,
+        extracted_city: str | None,
+        extracted_address: str | None,
+        postal_code: str | None,
+        fallback_city: str | None,
+        page_url: str,
+    ) -> str | None:
+        for candidate in (
+            extracted_city,
+            self._extract_city(extracted_address or "", None),
+            self._extract_city_from_page_url(page_url),
+            fallback_city,
+        ):
+            normalized = self._normalize_city_name(candidate, postal_code)
+            if normalized:
+                return normalized
+        return None
+
+    def _extract_city_from_page_url(self, page_url: str) -> str | None:
+        match = re.search(r"/vente-aux-encheres/[^/]+/([^/]+)/[^/]+/\d+\.html$", page_url)
+        if not match:
+            return None
+        return self._normalize_city_name(match.group(1), None)
+
+    def _normalize_city_name(self, value: str | None, postal_code: str | None) -> str | None:
+        if not value:
+            return None
+        normalized = unescape(str(value))
+        normalized = re.sub(r"\b\d{5}\b", "", normalized)
+        normalized = normalized.replace("_", "-")
+        normalized = re.sub(r"\s+", " ", normalized).strip(" ,;:-")
+        if not normalized:
+            return None
+        if normalized.lower() in {"inconnu", "tj inconnu"}:
+            return None
+        if postal_code and postal_code.startswith("75") and re.fullmatch(r"paris(?:\s+\d{1,2}(?:eme|er|ème)?)?", normalized, flags=re.IGNORECASE):
+            return normalized
+        parts = [part for part in normalized.split("-") if part]
+        return "-".join(part[:1].upper() + part[1:].lower() for part in parts) if parts else None
 
     def _extract_occupancy_status(self, text: str) -> str | None:
         lowered = text.lower()

@@ -14,11 +14,9 @@ from datetime import datetime
 import httpx
 
 from app.models.auction_listing import AuctionListing
+from app.services.auction_visit_service import get_actionable_visit_datetime, get_next_visit_schedule
 
 logger = logging.getLogger(__name__)
-
-_ELIGIBLE_CATEGORIES = {"prioritaire", "opportunite_rare"}
-
 
 def _format_currency(value: float | None) -> str:
     if value is None:
@@ -32,13 +30,26 @@ def _format_datetime(value: datetime | None) -> str:
     return value.strftime("%d/%m/%Y %H:%M")
 
 
-def is_auction_notification_eligible(listing: AuctionListing) -> bool:  # Eligibilite: categorie cible + pas encore notifie
-    if listing.categorie_investissement not in _ELIGIBLE_CATEGORIES:
+def is_auction_notification_eligible(
+    listing: AuctionListing,
+    window_days: int = 10,
+    reference: datetime | None = None,
+) -> bool:  # Eligibilite: categorie cible + visite proche + pas deja notifiee pour cette visite
+    next_visit_at = get_actionable_visit_datetime(listing, window_days=window_days, reference=reference)
+    if next_visit_at is None:
         return False
-    return not listing.telegram_notified
+    if listing.telegram_notified_for_visit_at == next_visit_at:
+        return False
+    if listing.telegram_notified and listing.telegram_notified_for_visit_at is None:
+        return False
+    return True
 
 
 def _build_auction_message(listing: AuctionListing) -> str:
+    next_visit_label = "—"
+    visit_schedule = get_next_visit_schedule(listing)
+    if visit_schedule is not None:
+        next_visit_label = visit_schedule[0]
     return (
         "🚨 Nouvelle annonce auctions prioritaire\n\n"
         f"🏷️ {listing.title}\n"
@@ -49,7 +60,7 @@ def _build_auction_message(listing: AuctionListing) -> str:
         f"🏦 Marché: {_format_currency(listing.valeur_marche_estimee)}\n"
         f"📅 Enchères: {_format_datetime(listing.auction_date)}\n"
         f"⚖️ Lieu: {listing.auction_location or listing.auction_tribunal or '—'}\n"
-        f"👀 Visite: {(listing.visit_dates or ['—'])[0]}\n"
+        f"👀 Visite: {next_visit_label}\n"
         f"📍 Visite lieu: {listing.visit_location or '—'}\n\n"
         f"{listing.raison_score or 'Analyse indisponible'}\n\n"
         f"🔗 {listing.source_url}"

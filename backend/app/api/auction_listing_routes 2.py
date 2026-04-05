@@ -5,11 +5,8 @@ Description:
 Endpoints de lecture pour audiences et annonces auctions.
 """
 
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.models.auction_listing import AuctionListing
 from app.models.auction_session import AuctionSession
@@ -18,7 +15,6 @@ from app.schemas.auction_schema import (
     AuctionListingStatus,
     AuctionSessionResponse,
 )
-from app.services.auction_visit_service import get_actionable_visit_datetime, paris_now
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 
@@ -43,49 +39,15 @@ def list_auction_listings(
     source_id: int | None = Query(None),
     session_id: int | None = Query(None),
     status_filter: AuctionListingStatus | None = Query(None, alias="status"),
-    actionable_only: bool = Query(False),
-    visit_window_days: int = Query(10, ge=1, le=365),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    query = db.query(AuctionListing).options(joinedload(AuctionListing.session))
+    query = db.query(AuctionListing)
     if source_id is not None:
         query = query.filter(AuctionListing.source_id == source_id)
     if session_id is not None:
         query = query.filter(AuctionListing.session_id == session_id)
     if status_filter is not None:
         query = query.filter(AuctionListing.status == status_filter)
-    if actionable_only:
-        reference = paris_now()
-        actionable: list[tuple[AuctionListing, datetime]] = []
-        for listing in query.all():
-            next_visit_at = get_actionable_visit_datetime(
-                listing,
-                window_days=visit_window_days,
-                reference=reference,
-            )
-            if next_visit_at is None:
-                continue
-            actionable.append((listing, next_visit_at))
-
-        actionable.sort(
-            key=lambda item: (
-                -(item[0].score_global or 0),
-                item[1],
-                -item[0].id,
-            )
-        )
-        return [listing for listing, _ in actionable[offset : offset + limit]]
-
-    return (
-        query.order_by(
-            case((AuctionListing.score_global.is_(None), 1), else_=0).asc(),
-            AuctionListing.score_global.desc(),
-            AuctionListing.last_seen_at.desc(),
-            AuctionListing.id.desc(),
-        )
-        .limit(limit)
-        .offset(offset)
-        .all()
-    )
+    return query.order_by(AuctionListing.last_seen_at.desc(), AuctionListing.id.desc()).limit(limit).offset(offset).all()

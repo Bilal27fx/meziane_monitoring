@@ -11,7 +11,8 @@ import type { AuctionAgentRun, AuctionListing } from '@/lib/types'
 import Modal from '@/components/ui/Modal'
 import toast from 'react-hot-toast'
 
-const ELIGIBLE_CATEGORIES = new Set(['prioritaire', 'opportunite_rare'])
+const ELIGIBLE_CATEGORIES = new Set(['prioritaire', 'opportunite_rare', 'a_etudier'])
+const VISIT_WINDOW_OPTIONS = [10, 30, 100] as const
 
 function statusClasses(status: AuctionAgentRun['status']) {
   switch (status) {
@@ -97,17 +98,16 @@ function displayValue(value?: string | null, empty = '—') {
 export default function AuctionRunsPanel() {
   const { data: runs = [], refetch, isFetching } = useAuctionAgentRuns()
   const launchRun = useLaunchLicitorAuctionRun()
-  const { data: listings = [], isLoading: isListingsLoading } = useAuctionListings('licitor')
+  const [visitWindowDays, setVisitWindowDays] = useState<(typeof VISIT_WINDOW_OPTIONS)[number]>(30)
+  const { data: listings = [], isLoading: isListingsLoading } = useAuctionListings('licitor', visitWindowDays)
   const [detailListing, setDetailListing] = useState<AuctionListing | null>(null)
 
   const latestRun = runs[0] ?? null
   const filteredListings = useMemo(
     () =>
-      listings.filter(
-        (listing) =>
-          listing.categorie_investissement != null &&
-          ELIGIBLE_CATEGORIES.has(listing.categorie_investissement)
-      ),
+      listings
+        .filter((listing) => listing.categorie_investissement != null && ELIGIBLE_CATEGORIES.has(listing.categorie_investissement))
+        .sort((a, b) => (b.score_global ?? 0) - (a.score_global ?? 0)),
     [listings]
   )
   const shortlistCount = useMemo(
@@ -134,11 +134,27 @@ export default function AuctionRunsPanel() {
             <p className="text-[10px] uppercase tracking-[0.18em] text-[#6ee7b7]">Licitor</p>
             <h3 className="mt-1 text-sm font-semibold text-white">Annonces triées par score</h3>
             <p className="mt-0.5 text-[11px] text-[#737373]">
-              Vue compacte des biens avec enchères, visite et accès détail.
+              Prioritaires avec visite à venir dans {visitWindowDays} jours maximum.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="inline-flex rounded-lg border border-[#2a2a2a] bg-[#171717] p-1">
+              {VISIT_WINDOW_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setVisitWindowDays(option)}
+                  className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${
+                    visitWindowDays === option
+                      ? 'bg-[#22c55e] text-black'
+                      : 'text-[#a3a3a3] hover:bg-[#1f1f1f] hover:text-white'
+                  }`}
+                >
+                  {option} j
+                </button>
+              ))}
+            </div>
             <button
               onClick={() => refetch()}
               className="h-9 w-9 rounded-lg border border-[#2a2a2a] bg-[#171717] hover:bg-[#1f1f1f] transition-colors flex items-center justify-center"
@@ -192,7 +208,7 @@ export default function AuctionRunsPanel() {
           <div>
             <h3 className="text-xs font-semibold text-white">Catalogue</h3>
             <p className="mt-1 text-[10px] uppercase tracking-wide text-[#525252]">
-              Lecture rapide · filtre actif sur prioritaire et opportunité rare
+              Lecture rapide · filtre actif sur a_etudier/prioritaire/opportunité rare avec visite sous {visitWindowDays} jours
             </p>
           </div>
           <div className="text-[11px] font-mono text-[#737373]">
@@ -211,14 +227,14 @@ export default function AuctionRunsPanel() {
             <div className="rounded-xl border border-dashed border-[#262626] bg-[#141414] px-6 py-12 text-center">
               <FileSearch className="mx-auto h-6 w-6 text-[#404040]" />
               <p className="mt-4 text-sm text-[#d4d4d4]">Aucune annonce prioritaire ou opportunité rare.</p>
-              <p className="mt-2 text-xs text-[#737373]">Lance un run pour recalculer le catalogue Licitor.</p>
+              <p className="mt-2 text-xs text-[#737373]">Aucune annonce scorée (a_etudier / prioritaire / opportunité rare) avec visite sous {visitWindowDays} jours. Lance un nouveau run pour rescorer.</p>
             </div>
           ) : (
             <div className="space-y-1.5">
               {hiddenListingsCount > 0 ? (
                 <div className="rounded-lg border border-[#3f3f46] bg-[#161616] px-3 py-2 text-[11px] text-[#a3a3a3]">
                   {listings.length} annonces récupérées par l&apos;API, {filteredListings.length} affichées.
-                  Les {hiddenListingsCount} autres sont masquées car hors catégories `prioritaire` / `opportunite_rare`.
+                  Les {hiddenListingsCount} autres sont masquées car hors catégories cibles ou sans visite actionnable sous {visitWindowDays} jours.
                 </div>
               ) : null}
               <div className="hidden rounded-lg border border-[#262626] bg-[#141414] px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-[#6b7280] lg:grid lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_minmax(0,1.3fr)_auto] lg:items-center lg:gap-3">
@@ -292,9 +308,6 @@ export default function AuctionRunsPanel() {
                         {listing.auction_date ? formatDateTime(listing.auction_date) : 'Date non renseignée'}
                       </p>
                       <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#c7d2cc]">
-                        {displayValue(listing.auction_location, 'Lieu non renseigné')}
-                      </p>
-                      <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-[#8fb3a0]">
                         {displayValue(listing.auction_tribunal, 'Tribunal non renseigné')}
                       </p>
                     </div>
@@ -357,13 +370,10 @@ export default function AuctionRunsPanel() {
               <div className="rounded-md border border-[#22c55e]/25 bg-[#0f1a12] p-4">
                 <p className="text-[10px] uppercase tracking-[0.18em] text-[#6ee7b7]">Enchères</p>
                 <p className="mt-2 text-sm font-semibold text-white">
-                  {displayValue(detailListing.auction_tribunal, 'Tribunal non renseigné')}
+                  {detailListing.auction_date ? formatDateTime(detailListing.auction_date) : 'Date non renseignée'}
                 </p>
                 <p className="mt-2 text-xs text-[#d4d4d4]">
-                  Date: {detailListing.auction_date ? formatDateTime(detailListing.auction_date) : '—'}
-                </p>
-                <p className="mt-1 text-xs text-[#a3a3a3]">
-                  Lieu: {displayValue(detailListing.auction_location)}
+                  {displayValue(detailListing.auction_tribunal, 'Tribunal non renseigné')}
                 </p>
               </div>
 

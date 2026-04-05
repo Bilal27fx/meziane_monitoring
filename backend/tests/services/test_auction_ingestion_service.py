@@ -91,6 +91,11 @@ def _stub_score_listing(listing, db):
 
 def test_execute_auction_ingestion_run_persists_session_and_listing(db_session, monkeypatch):
     monkeypatch.setattr("app.services.auction_ingestion_service.score_listing", _stub_score_listing)
+    monkeypatch.setattr("app.services.auction_ingestion_service.is_auction_notification_eligible", lambda listing: True)
+    monkeypatch.setattr(
+        "app.services.auction_ingestion_service.get_actionable_visit_datetime",
+        lambda listing, reference=None: datetime(2026, 3, 10, 14, 0, 0),
+    )
     monkeypatch.setattr("app.services.auction_ingestion_service.send_auction_listing_notification", lambda listing: True)
     run = _build_run(db_session)
 
@@ -133,6 +138,14 @@ def test_execute_auction_ingestion_run_persists_session_and_listing(db_session, 
 
 def test_execute_auction_ingestion_run_is_idempotent_for_existing_records(db_session, monkeypatch):
     monkeypatch.setattr("app.services.auction_ingestion_service.score_listing", _stub_score_listing)
+    monkeypatch.setattr(
+        "app.services.auction_ingestion_service.is_auction_notification_eligible",
+        lambda listing: listing.telegram_notified_for_visit_at is None,
+    )
+    monkeypatch.setattr(
+        "app.services.auction_ingestion_service.get_actionable_visit_datetime",
+        lambda listing, reference=None: datetime(2026, 3, 10, 14, 0, 0),
+    )
     monkeypatch.setattr("app.services.auction_ingestion_service.send_auction_listing_notification", lambda listing: True)
     first_run = _build_run(db_session)
     execute_auction_ingestion_run(db_session, first_run.id)
@@ -189,6 +202,11 @@ def test_execute_auction_ingestion_run_is_idempotent_for_existing_records(db_ses
 
 def test_execute_auction_ingestion_run_replaces_unknown_session_values_with_detail_header(db_session, monkeypatch):
     monkeypatch.setattr("app.services.auction_ingestion_service.score_listing", _stub_score_listing)
+    monkeypatch.setattr("app.services.auction_ingestion_service.is_auction_notification_eligible", lambda listing: True)
+    monkeypatch.setattr(
+        "app.services.auction_ingestion_service.get_actionable_visit_datetime",
+        lambda listing, reference=None: datetime(2026, 4, 14, 14, 0, 0),
+    )
     monkeypatch.setattr("app.services.auction_ingestion_service.send_auction_listing_notification", lambda listing: True)
 
     run = _build_run(db_session, source_code="licitor")

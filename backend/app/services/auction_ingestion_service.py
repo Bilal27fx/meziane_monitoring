@@ -20,6 +20,7 @@ from app.models.agent_run_event import AgentRunEventLevel
 from app.models.auction_listing import AuctionListing, AuctionListingStatus
 from app.models.auction_session import AuctionSession, AuctionSessionStatus
 from app.models.auction_source import AuctionSource
+from app.models.licitor_extraction import LicitorExtraction
 from app.services.auction_fetch_service import AuctionFetchService
 from app.services.auction_run_log_service import log_agent_run_event
 from app.services.auction_scoring_service import score_listing
@@ -27,6 +28,7 @@ from app.services.telegram_notification_service import (
     is_auction_notification_eligible,
     send_auction_listing_notification,
 )
+from app.services.auction_visit_service import get_actionable_visit_datetime, paris_now
 
 
 def _is_unknown_placeholder(value: str | None) -> bool:
@@ -85,6 +87,7 @@ class AuctionIngestionService:
                     detail_html = detail_pages.get(listing.source_url)
                     if detail_html:
                         detail = self.adapter.parse_listing_detail(detail_html, listing.source_url, raw_listing)
+                        self._persist_licitor_extraction(listing, detail.facts)
                         self._apply_listing_detail(listing, detail.facts)
                         counters["listings_normalized"] += 1
                         self._accumulate_data_quality(counters["data_quality"], listing)
@@ -93,8 +96,11 @@ class AuctionIngestionService:
                         if scored:
                             counters["listings_scored"] += 1
                             if is_auction_notification_eligible(listing):
+                                actionable_visit_at = get_actionable_visit_datetime(listing, reference=paris_now())
                                 if send_auction_listing_notification(listing):
                                     listing.telegram_notified = True
+                                    listing.telegram_notified_at = datetime.utcnow()
+                                    listing.telegram_notified_for_visit_at = actionable_visit_at
                                     counters["notifications_sent"] += 1
 
         self.db.commit()
@@ -262,31 +268,53 @@ class AuctionIngestionService:
             listing.jardin = facts["jardin"]
         if facts.get("property_details"):
             listing.property_details = facts["property_details"]
+        if facts.get("city") and (_is_unknown_placeholder(listing.city) or listing.city is None):
+            listing.city = facts["city"]
         listing.postal_code = facts.get("postal_code") or listing.postal_code
         listing.address = facts.get("address") or listing.address
         listing.occupancy_status = facts.get("occupancy_status") or listing.occupancy_status
         if facts.get("visit_dates"):
             listing.visit_dates = facts["visit_dates"]
-        if listing.city is None and listing.address:
+        if _is_unknown_placeholder(listing.city) and listing.address:
             address_lines = [line.strip() for line in str(listing.address).splitlines() if line.strip()]
             if address_lines:
                 listing.city = address_lines[0]
-        if listing.session and facts.get("auction_date"):
-            current_session_datetime = listing.session.session_datetime
-            detail_auction_date = facts["auction_date"]
-            should_replace_datetime = (
-                current_session_datetime is None
-                or current_session_datetime != detail_auction_date
-            )
-            if should_replace_datetime:
-                listing.session.session_datetime = detail_auction_date
-        if listing.session and facts.get("auction_tribunal"):
-            if _is_unknown_placeholder(listing.session.tribunal) or listing.session.tribunal != facts["auction_tribunal"]:
-                listing.session.tribunal = facts["auction_tribunal"]
+        # Stocker auction_date et auction_tribunal par listing dans property_details
+        # (la session est partagée entre plusieurs lots — on ne l'écrase plus)
+        details = dict(listing.property_details or {})
+        if facts.get("auction_date"):
+            details["auction_date"] = facts["auction_date"].isoformat()
+        if facts.get("auction_tribunal"):
+            details["auction_tribunal"] = facts["auction_tribunal"]
+        if listing.city:
+            details["auction_city"] = listing.city
+        listing.property_details = details
+        # Mise à jour session uniquement si elle n'a aucune donnée (premier listing)
+        if listing.session and facts.get("auction_date") and listing.session.session_datetime is None:
+            listing.session.session_datetime = facts["auction_date"]
+        if listing.session and facts.get("auction_tribunal") and _is_unknown_placeholder(listing.session.tribunal):
+            listing.session.tribunal = facts["auction_tribunal"]
         if listing.session and listing.city and _is_unknown_placeholder(listing.session.city):
             listing.session.city = listing.city
         listing.status = AuctionListingStatus.NORMALIZED
         listing.last_seen_at = datetime.utcnow()
+
+    def _persist_licitor_extraction(self, listing: AuctionListing, facts: dict) -> None:
+        """Sauvegarde l'extraction LLM brute pour audit et debug."""
+        llm_payload = facts.get("llm_extraction")
+        if not llm_payload:
+            return
+        existing = self.db.query(LicitorExtraction).filter(LicitorExtraction.listing_id == listing.id).first()
+        if existing:
+            existing.parsed_extraction = llm_payload
+            existing.extracted_at = datetime.utcnow()
+        else:
+            self.db.add(LicitorExtraction(
+                listing_id=listing.id,
+                parsed_extraction=llm_payload,
+                extraction_model="gpt-4o-mini",
+                extracted_at=datetime.utcnow(),
+            ))
 
     def _infer_listing_type(self, title: str) -> str | None:
         lowered = title.lower()

@@ -68,68 +68,24 @@ class AuctionListing(Base):  # Annonce normalisee d'enchere
     # Dates
     visit_dates = Column(JSON, nullable=True)
 
-    # Scoring hybride
+    # Scoring LLM
     score_global = Column(Integer, nullable=True, index=True)
     score_localisation = Column(Integer, nullable=True)
     score_prix = Column(Integer, nullable=True)
     score_potentiel = Column(Integer, nullable=True)
-    score_cible_paris_petite_surface = Column(Integer, nullable=True)
-    score_liquidite = Column(Integer, nullable=True)
-    score_occupation = Column(Integer, nullable=True)
-    score_qualite_bien = Column(Integer, nullable=True)
-    bonus_strategique = Column(Integer, nullable=True)
-    categorie_investissement = Column(String(40), nullable=True)
     loyer_estime = Column(Float, nullable=True)
     rentabilite_brute = Column(Float, nullable=True)
-    travaux_estimes = Column(Float, nullable=True)
-    valeur_marche_estimee = Column(Float, nullable=True)
-    valeur_marche_ajustee = Column(Float, nullable=True)
-    prix_max_cible = Column(Float, nullable=True)
-    prix_max_agressif = Column(Float, nullable=True)
     raison_score = Column(Text, nullable=True)
     risques_llm = Column(JSON, nullable=True)
     recommandation = Column(String(30), nullable=True)
     scored_at = Column(DateTime, nullable=True)
-    telegram_notified = Column(Boolean, nullable=False, default=False)
-    telegram_notified_at = Column(DateTime, nullable=True)
-    telegram_notified_for_visit_at = Column(DateTime, nullable=True)
 
     source = relationship("AuctionSource", back_populates="listings")
     session = relationship("AuctionSession", back_populates="listings")
 
     @property
-    def auction_date(self):  # Date d'enchère : property_details en priorité, sinon session
-        details = self.property_details or {}
-        raw = details.get("auction_date")
-        if raw:
-            try:
-                return datetime.fromisoformat(str(raw).split("/")[0].strip())
-            except (ValueError, TypeError):
-                pass
+    def auction_date(self):  # Date d'enchère depuis la session liée
         return self.session.session_datetime if self.session else None
-
-    @property
-    def auction_tribunal(self):  # Tribunal : property_details en priorité, sinon session
-        details = self.property_details or {}
-        if details.get("auction_tribunal"):
-            return details["auction_tribunal"]
-        return self.session.tribunal if self.session else None
-
-    @property
-    def auction_location(self):  # Libellé lisible du lieu d'enchère
-        tribunal = self.auction_tribunal or ""
-        city = (self.property_details or {}).get("auction_city") or (self.session.city if self.session else None)
-        if city and city.lower() not in tribunal.lower():
-            return f"{tribunal} · {city}".strip(" ·")
-        return tribunal or None
-
-    @property
-    def visit_location(self):  # Meilleur lieu de visite disponible
-        if isinstance(self.property_details, dict):
-            visit = self.property_details.get("visit")
-            if isinstance(visit, dict) and visit.get("location"):
-                return visit["location"]
-        return None
 
     def __repr__(self):
         return f"<AuctionListing {self.id} {self.title[:40]}>"
