@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.agents.auction.adapters.base import RawListing
 from app.agents.auction.adapters.licitor import LicitorAuctionAdapter
 from app.agents.auction.adapters.base import RawSession
 
@@ -607,3 +608,38 @@ def test_parse_listing_detail_extracts_address_with_appartement_keyword():
 
     assert detail.facts["address"] is not None
     assert "8 rue de la Roquette" in detail.facts["address"]
+
+
+def test_parse_listing_detail_recovers_city_from_page_url_when_listing_city_unknown():
+    html = """
+    <html>
+      <body>
+        <h1>Un studio</h1>
+        <p>Surface : 21 m²</p>
+        <p>Mise à prix : 57 000 €</p>
+        <p>6, rue Kléber</p>
+        <p>92400 Courbevoie</p>
+      </body>
+    </html>
+    """
+
+    adapter = LicitorAuctionAdapter()
+    listing = RawListing(
+        external_id="10/78/43/vente-aux-encheres/un-studio/courbevoie/hauts-de-seine/107843",
+        source_url="https://www.licitor.com/annonce/10/78/43/vente-aux-encheres/un-studio/courbevoie/hauts-de-seine/107843.html",
+        title="Un studio",
+        reserve_price=57000.0,
+        city="INCONNU",
+        postal_code=None,
+        surface_m2=21.0,
+        reference_annonce="10/78/43/vente-aux-encheres/un-studio/courbevoie/hauts-de-seine/107843",
+    )
+
+    detail = adapter.parse_listing_detail(
+        html,
+        listing.source_url,
+        listing,
+    )
+
+    assert detail.facts["city"] == "Courbevoie"
+    assert detail.facts["postal_code"] == "92400"

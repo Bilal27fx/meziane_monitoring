@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -204,6 +204,80 @@ def test_list_sessions_and_listings_with_filters(db_session):
             assert enriched_listing["auction_tribunal"] == "TJ Paris"
             assert enriched_listing["auction_location"] == "TJ Paris · Paris"
             assert enriched_listing["visit_location"] is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_list_auction_listings_can_filter_actionable_upcoming_visits(db_session):
+    app = _build_app(db_session)
+    now = datetime.now()
+
+    source = AuctionSource(
+        code="licitor_paris",
+        name="Licitor Paris",
+        base_url="https://www.licitor.com",
+        status=AuctionSourceStatus.ACTIVE,
+    )
+    db_session.add(source)
+    db_session.flush()
+
+    session = AuctionSession(
+        source_id=source.id,
+        external_id="tj-paris-upcoming",
+        tribunal="TJ Paris",
+        city="Paris",
+        source_url="https://www.licitor.com/session/tj-paris-upcoming",
+        session_datetime=now + timedelta(days=20),
+        announced_listing_count=2,
+        status=AuctionSessionStatus.DISCOVERED,
+    )
+    db_session.add(session)
+    db_session.flush()
+
+    in_window = now + timedelta(days=5)
+    out_window = now + timedelta(days=15)
+    db_session.add_all(
+        [
+            AuctionListing(
+                source_id=source.id,
+                session_id=session.id,
+                external_id="upcoming-1",
+                source_url="https://www.licitor.com/annonce/upcoming-1",
+                title="Petit appartement Paris 11eme",
+                city="Paris",
+                postal_code="75011",
+                score_global=92,
+                categorie_investissement="opportunite_rare",
+                visit_dates=[in_window.strftime("%d/%m/%Y à %Hh%M")],
+                status=AuctionListingStatus.NORMALIZED,
+            ),
+            AuctionListing(
+                source_id=source.id,
+                session_id=session.id,
+                external_id="upcoming-2",
+                source_url="https://www.licitor.com/annonce/upcoming-2",
+                title="Appartement Paris 19eme",
+                city="Paris",
+                postal_code="75019",
+                score_global=88,
+                categorie_investissement="prioritaire",
+                visit_dates=[out_window.strftime("%d/%m/%Y à %Hh%M")],
+                status=AuctionListingStatus.NORMALIZED,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(
+                "/api/auction-data/listings",
+                params={"actionable_only": "true", "visit_window_days": 10},
+            )
+            assert response.status_code == 200
+            payload = response.json()
+            assert len(payload) == 1
+            assert payload[0]["external_id"] == "upcoming-1"
     finally:
         app.dependency_overrides.clear()
 

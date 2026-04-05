@@ -1,12 +1,56 @@
 {
+  "_methodology": {
+    "description": "Scoring hybride des ventes judiciaires immobilieres. Objectif : identifier les pepites avant la concurrence et fixer deux prix cles par annonce.",
+    "pricing_model": {
+      "prix_interessant": {
+        "definition": "Prix maximum d'enchere en dessous duquel l'affaire est vraiment interessante. Marge nette cible >= 20% apres frais et travaux.",
+        "formula": "(valeur_prudente × coeff_interessant - travaux_estimes) / (1 + frais_adjudication_ratio)",
+        "coeff_interessant": 0.70,
+        "interpretation": "On acquiert a 70% de la valeur prudente. Apres frais et travaux, on garde une vraie marge de securite."
+      },
+      "prix_palier": {
+        "definition": "Prix au-dela duquel l'operation ne presente plus d'interet. Marge nette < 8% apres frais et travaux.",
+        "formula": "(valeur_prudente × coeff_palier - travaux_estimes) / (1 + frais_adjudication_ratio)",
+        "coeff_palier": 0.83,
+        "interpretation": "On acquiert a 83% de la valeur prudente. Au-dessus, on laisse encherir les autres."
+      },
+      "prix_safe": {
+        "definition": "Prix de securite pour marge cible de 25% sur valeur prudente.",
+        "formula": "(valeur_prudente × 0.75 - travaux_estimes) / (1 + frais_adjudication_ratio)",
+        "target_margin": 0.25
+      },
+      "valeur_marche_ajustee": "valeur_marche_estimee × coeff_occupation (1.0 si libre, 0.90 si inconnu, 0.78 si occupe)",
+      "valeur_prudente": "valeur_marche_ajustee × coeff_prudence si signaux de risque, sinon valeur_marche_ajustee",
+      "prix_estime_enchere": "mise_a_prix × multiplicateur_enchere (utilise uniquement pour les prix cibles, pas pour le scoring)",
+      "frais_adjudication": "10% du prix d'adjudication (emoluments, droits, taxes)"
+    },
+    "score_global": {
+      "definition": "Synthese ponderee de 5 dimensions independantes. 0 = nul, 100 = pepite absolue.",
+      "weights": {
+        "localisation": "25% — Zone geographique : Paris > premiere couronne > grande couronne",
+        "surface": "20% — Surface dans la cible 18-35m2",
+        "prix": "30% — Mise a prix au m2 vs prix marche du secteur : c'est la decote judiciaire reelle",
+        "composition": "15% — Typologie + etat + annexes",
+        "occupation": "10% — Libre = ideal, occupe = risque procedure"
+      }
+    },
+    "categories": {
+      "opportunite_rare": "Score >= 85. Pepite. Agir vite, se positionner agressivement.",
+      "prioritaire": "Score >= 70. Bonne affaire. A etudier serieusement avant l'audience.",
+      "a_etudier": "Score >= 55. Interessant sous conditions. Verifier les risques.",
+      "hors_cible": "Score < 55. Passer son chemin."
+    },
+    "llm_role": "Le LLM ne calcule pas le score global. Il fournit 3 signaux bornes : bonus micro-localisation, bonus qualite intrinseque, estimation travaux. Ces signaux affinent le calcul deterministe. Il produit aussi la synthese narrative et les risques."
+  },
   "llm": {
-    "model": "gpt-5.4-mini",
+    "model": "gpt-4o-mini",
     "temperature": 0.1,
     "timeout": 20,
-    "system_prompt": "Tu es un agent immobilier professionnel expert des ventes judiciaires en France. Tu reperes les opportunites en or avant la concurrence, mais tu restes factuel, discipline et prudent sur les risques. Tu ne produis jamais de score global libre. Tu reponds uniquement en JSON valide, sans texte additionnel.",
-    "user_prompt_template": "Tu travailles comme agent immobilier professionnel specialise en ventes judiciaires immobilieres en France.\nTa mission est de detecter avant tout le monde les vraies opportunites en or, tout en restant lucide sur les pieges classiques des encheres.\n\nTu ne joues pas un role generique de conseiller immobilier.\nTu raisonnes comme un professionnel du marche qui:\n- cherche des biens sous-valorises avant la concurrence\n- privilegie la liquidite, la revente et le potentiel locatif reel\n- valorise fortement les petites surfaces a Paris et les micro-localisations tendues\n- penalise severement les biens complexes, peu liquides, occupes ou juridiquement flous\n- reste discipline: pas d'enthousiasme artificiel, pas d'invention, pas de score global libre\n\nLe score global final est calcule par le systeme.\nTu fournis uniquement des signaux qualitatifs bornes qui ameliorent la precision du scoring deterministe.\n\n**Annonce :**\n- Titre : {title}\n- Type : {listing_type}\n- Ville : {city} ({postal_code})\n- Adresse : {address}\n- Surface : {surface}\n- Pieces : {nb_pieces}\n- Chambres : {nb_chambres}\n- Etage : {floor}\n- Composants : {components}\n- Mise a prix : {reserve_price}\n- Prix/m2 : {price_m2}\n- Occupation : {occupancy}\n- Audience : {auction_date}\n- Lieu audience : {auction_location}\n- Premiere visite : {visit_date}\n- Details structures : {property_details}\n- URL : {source_url}\n\n**Contexte metier :**\n- Il s'agit d'un agent qui doit faire remonter rapidement les meilleures ventes judiciaires avant qu'elles soient travaillees par d'autres investisseurs.\n- On veut capter les opportunites les plus actionnables, pas faire une expertise notariale complete.\n- Une annonce peut sembler bon marche mais etre mediocre si la sortie est lente, l'occupation mauvaise ou le quartier peu liquide.\n- Inversement, un petit bien tres liquide dans une bonne zone peut meriter un bonus fort meme si le texte source est imparfait.\n\n**Contexte d'investissement :**\n- Loyer de reference estime pour cette zone : {loyer_ref}EUR/mois\n- Decote occupation : {occupation_discount_hint}\n- Frais judiciaires a prevoir : ~{frais_adjudication_percent}% du prix d'adjudication\n- Strategie cible : {strategy_target}\n- Coeur de cible absolu : {absolute_target}\n- Categorie actuelle calculee par le systeme : {current_category}\n\n**Contraintes de reponse**\n- `micro_localisation_bonus` doit etre un entier entre -10 et 10\n- `qualite_bien_bonus` doit etre un entier entre -10 et 10\n- `travaux_estimes` doit rester prudent et realiste\n- Ne pas recalculer de score global\n- N'invente pas de donnees absentes\n- Si l'information est insuffisante, reste modere plutot que speculatif\n- Les bonus doivent etre rares et merites\n- Les malus doivent etre francs si la liquidite ou la sortie semblent mauvaises\n\n**Ta mission :**\n1. Estime un bonus/malus de micro-localisation en te demandant si un investisseur reactif voudrait vraiment se positionner vite\n2. Estime un bonus/malus de qualite intrinseque du bien pour la location et la revente\n3. Estime les travaux seulement s'il existe de vrais signaux de defaut ou d'obsolescence\n4. Redige une synthese courte orientee decision, comme pour un investisseur professionnel\n5. Liste les risques principaux qui peuvent detruire la valeur ou la vitesse de sortie\n\n**Reperes d'analyse**\n- Bonus micro-localisation: zone tres recherchee, excellente desserte, quartier liquide, adresse credible pour petite surface\n- Malus micro-localisation: marche lent, desserte faible, commune peu demandee, revente ou relocation difficiles\n- Bonus qualite: plan efficace, etage correct, ascenseur si etage eleve, balcon/terrasse, cave, bon etat, luminosite\n- Malus qualite: RDC penalise, gros travaux, distribution faible, bien atypique, nuisances probables\n- Travaux: reste credible et conservateur, ne gonfle pas sans signal texte reel\n\nReponds UNIQUEMENT en JSON valide :\n{\n    \"micro_localisation_bonus\": <int -10..10>,\n    \"qualite_bien_bonus\": <int -10..10>,\n    \"travaux_estimes\": <float>,\n    \"raison_score\": \"<explication 2-3 phrases>\",\n    \"risques\": [\"<risque1>\", \"<risque2>\"]\n}"
+    "system_prompt": "Tu es un chasseur de pepites immobilieres specialise dans les ventes judiciaires francaises. Tu detectes les vraies opportunites sous-valorisees avant la concurrence. Tu restes factuel, discipline et dur sur les risques. Tu privilegies le doute, les malus et la prudence plutot que l'enthousiasme. Les bonus +8 a +10 sont tres rares. Si l'information est incomplete, 0 ou leger malus est prefere a un bonus speculatif. Tu reponds uniquement en JSON valide, sans texte additionnel. Tu ne calcules jamais de score global.",
+    "user_prompt_template": "Tu analyses une annonce de vente judiciaire pour un investisseur professionnel qui cherche des pepites immobilieres.\n\nTon role est precis :\n1. Evaluer la micro-localisation reelle pour la location et la revente, sans biais automatique pro-Paris\n2. Evaluer la qualite intrinseque du bien de facon conservative\n3. Estimer les travaux seulement s'il existe des signaux textes credibles\n4. Produire une synthese buy/pass tres courte et tres prudente\n5. Lister les risques qui peuvent detruire la valeur, la liquidite ou la sortie\n\nRappel du modele de prix utilise par le systeme :\n- Le scoring n'utilise PAS la mise a prix brute comme vrai prix d'acquisition\n- Prix estime encheres pour le scoring : {estimated_auction_price}\n- Multiplicateur d'enchere de travail : x{auction_price_multiplier}\n- Valeur marche estimee : {market_value_estimated}\n- Valeur prudente retenue : {conservative_market_value}\n- Prix interessant = prix cible pour garder une marge nette > 20%%\n- Prix palier = maximum absolu au-dela duquel on laisse encherir les autres\n- Frais judiciaires ~{frais_adjudication_percent}%% du prix d'adjudication\n- Usage detecte : {usage_type}\n\n**Annonce :**\n- Titre : {title}\n- Type : {listing_type}\n- Ville : {city} ({postal_code})\n- Adresse : {address}\n- Surface : {surface}\n- Pieces : {nb_pieces} | Chambres : {nb_chambres}\n- Etage : {floor}\n- Composants : {components}\n- Mise a prix : {reserve_price}\n- Prix/m2 affiche : {price_m2}\n- Occupation : {occupancy}\n- Date audience : {auction_date}\n- Lieu audience : {auction_location}\n- Premiere visite : {visit_date}\n- Details structures : {property_details}\n- URL : {source_url}\n\n**Contexte marche :**\n- Loyer de reference estime : {loyer_ref} EUR/mois\n- Decote occupation appliquee : {occupation_discount_hint}\n- Strategie cible : {strategy_target}\n- Coeur de cible absolu : {absolute_target}\n- Categorie actuelle calculee par le systeme : {current_category}\n\n**Deal breakers a garder en tete :**\n- Surface inferieure a 12m2\n- Usage hors habitation (bureau, commerce, local atypique)\n- Mise a prix + frais + travaux superieur a la valeur prudente estimee\n- Occupation inconnue ou tres floue\n- Bien atypique, gros travaux non documentes, ou informations structurelles trop faibles\n\n**Discipline d'analyse :**\n- Paris n'est pas un jackpot automatique : confirme toujours la liquidite reelle et la qualite de sortie\n- Si risque ou incertitude, limite fortement les bonus de localisation\n- `micro_localisation_bonus` doit rester entre -10 et +10, avec 0 par defaut si doute\n- `qualite_bien_bonus` doit rester entre -10 et +10, avec 0 par defaut si doute\n- Les bonus +8 a +10 sont exceptionnels\n- En cas d'information insuffisante, prefere 0 ou un leger malus plutot qu'un bonus\n- `travaux_estimes` doit etre prudent, jamais agressif sans preuve textuelle\n- Ne jamais inventer de donnees absentes du texte\n\nReponds UNIQUEMENT en JSON valide :\n{\n    \"micro_localisation_bonus\": <int -10..10>,\n    \"qualite_bien_bonus\": <int -10..10>,\n    \"travaux_estimes\": <float>,\n    \"raison_score\": \"<synthese 2-3 phrases orientee decision>\",\n    \"risques\": [\"<risque1>\", \"<risque2>\"]\n}"
   },
   "market": {
+    "_comment": "Loyers de reference en EUR/m2/mois et prix marche en EUR/m2 par departement IDF",
     "loyers_idf": {
       "75": 30.0,
       "92": 24.0,
@@ -19,6 +63,7 @@
     },
     "loyer_defaut": 15.0,
     "reference_price_m2": {
+      "_comment": "Prix marche moyen EUR/m2 par departement — base estimation valeur marche",
       "75": 11000.0,
       "92": 7600.0,
       "93": 4200.0,
@@ -29,39 +74,115 @@
       "78": 4300.0
     },
     "reference_price_m2_default": 2500.0,
-    "frais_adjudication_ratio": 0.1,
+    "frais_adjudication_ratio": 0.10,
     "premium_near_paris": [
+      "asnieres-sur-seine",
       "boulogne-billancourt",
+      "charenton-le-pont",
       "neuilly-sur-seine",
       "levallois-perret",
+      "courbevoie",
+      "colombes",
+      "puteaux",
+      "suresnes",
+      "saint-ouen-sur-seine",
+      "pantin",
+      "montreuil",
+      "le-pre-saint-gervais",
       "vincennes",
       "issy-les-moulineaux",
       "montrouge",
       "saint-mande",
-      "clichy"
+      "clichy",
+      "nanterre",
+      "ville-d-avray"
     ],
     "occupancy_discount_coefficients": {
+      "_comment": "Decote appliquee a la valeur marche selon le statut d'occupation",
       "occupe": 0.78,
+      "inconnu": 0.90,
       "default": 1.0
     }
   },
   "scoring": {
+    "_comment": "Parametres du scoring deterministe. Le LLM ne modifie que les bonus micro-localisation et qualite.",
     "category_thresholds": {
+      "_comment": "Score global minimum par categorie",
       "opportunite_rare": 85,
       "prioritaire": 70,
       "a_etudier": 55
     },
-    "strategy_target": "prioriser petits biens a Paris, surtout 9 a 35m2",
-    "absolute_target": "18 a 25m2",
-    "occupation_discount_hint": "-15% a -30% si bien occupe",
+    "strategy_target": "prioriser Paris intra-muros et la petite couronne proche, surtout 9 a 35m2",
+    "absolute_target": "18 a 30m2 a Paris et en peripherie tres proche",
+    "occupation_discount_hint": "-10% si inconnu, -22% si occupe",
+    "location_hierarchy": {
+      "_comment": "Hierarchie fine par commune pour eviter une simple opposition Paris / banlieue.",
+      "premiere_couronne_liquide": [
+        "asnieres-sur-seine",
+        "boulogne-billancourt",
+        "charenton-le-pont",
+        "clichy",
+        "courbevoie",
+        "issy-les-moulineaux",
+        "levallois-perret",
+        "montrouge",
+        "neuilly-sur-seine",
+        "puteaux",
+        "saint-mande",
+        "saint-ouen-sur-seine",
+        "suresnes",
+        "vincennes"
+      ],
+      "premiere_couronne_solide": [
+        "aubervilliers",
+        "bagnolet",
+        "bobigny",
+        "colombes",
+        "fontenay-sous-bois",
+        "ivry-sur-seine",
+        "les-lilas",
+        "le-pre-saint-gervais",
+        "malakoff",
+        "montreuil",
+        "nanterre",
+        "pantin",
+        "vanves",
+        "villejuif"
+      ]
+    },
+    "score_weights": {
+      "_comment": "5 dimensions independantes. Total = 1.0",
+      "localisation": 0.25,
+      "surface": 0.20,
+      "prix": 0.30,
+      "composition": 0.15,
+      "occupation": 0.10
+    },
+    "auction_adjusted_price": {
+      "_comment": "Le multiplicateur est utilise uniquement pour prix_interessant et prix_palier, pas pour le score prix.",
+      "multiplier": {
+        "min": 1.5,
+        "avg": 1.7,
+        "max": 2.4
+      },
+      "use_avg_for_scoring": true
+    },
     "location_bases": {
+      "_comment": "Score de localisation de base par zone geographique (avant bonus LLM micro-localisation)",
       "paris": 100,
-      "premium_near_paris": 82,
+      "premiere_couronne_liquide": 92,
+      "premiere_couronne_solide": 78,
       "idf_core": 64,
-      "idf_outer": 42,
-      "other": 28
+      "idf_outer": 30,
+      "other": 16
+    },
+    "location_adjustment": {
+      "_comment": "Evite le biais Paris = jackpot si la liquidite ou le risque ne sont pas confirmes.",
+      "max_bonus_if_risk": 3,
+      "require_liquidity_confirmation": true
     },
     "typology_scores": {
+      "_comment": "Score typologique. Cible = studio/T1/T2. Large = T4/T5 = hors cible.",
       "target": 100,
       "medium": 60,
       "large": 20,
@@ -69,103 +190,115 @@
       "default": 40
     },
     "surface_scores": [
-      {
-        "max": 0,
-        "score": 20
-      },
-      {
-        "max": 8.99,
-        "score": 10
-      },
-      {
-        "max": 18,
-        "score": 90
-      },
-      {
-        "max": 25,
-        "score": 100
-      },
-      {
-        "max": 35,
-        "score": 86
-      },
-      {
-        "max": 45,
-        "score": 60
-      }
+      {"max": 0, "score": 20, "_comment": "Surface inconnue"},
+      {"max": 8.99, "score": 10, "_comment": "< 9m2 : non habitable, hors cible"},
+      {"max": 18, "score": 90, "_comment": "9-18m2 : studio optimal"},
+      {"max": 25, "score": 100, "_comment": "18-25m2 : coeur de cible absolu"},
+      {"max": 35, "score": 86, "_comment": "25-35m2 : tres bon"},
+      {"max": 45, "score": 60, "_comment": "35-45m2 : acceptable"},
+      {"max": 999, "score": 30, "_comment": "> 45m2 : hors cible principale"}
     ],
+    "surface_rules": {
+      "_comment": "Penalites directes si la surface est trop critique",
+      "<12": -25,
+      "12-14": -10,
+      "14-18": 0
+    },
+    "price_ratio_scores": {
+      "_comment": "ratio = (mise_a_prix / surface_m2) / prix_m2_reference_location — compare la decote judiciaire reelle au marche. Le multiplicateur 1.7x n'intervient PAS ici.",
+      "brackets": [
+        {"max": 0.35, "score": 100, "_comment": "< 35% du marche : decote maximale, opportunite rare"},
+        {"max": 0.50, "score": 85, "_comment": "35-50% : tres attractif"},
+        {"max": 0.65, "score": 65, "_comment": "50-65% : bon ecart"},
+        {"max": 0.80, "score": 40, "_comment": "65-80% : acceptable"},
+        {"max": 1.00, "score": 15, "_comment": "80-100% : proche du marche, peu d'interet"},
+        {"max": 9999, "score": 0, "_comment": "> marche : mise a prix aberrante"}
+      ]
+    },
+    "composition_scoring": {
+      "_comment": "Score composition : typologie cible + etat + annexes. Replaces score_qualite dans la ponderation.",
+      "base": 50,
+      "target_typology_bonus": 20,
+      "annexe_bonus": 8,
+      "storage_bonus": 6,
+      "floor_bonus": 5,
+      "lumineux_bonus": 5,
+      "ascenseur_bonus": 5,
+      "refait_bonus": 12,
+      "bon_etat_bonus": 8,
+      "rafraichir_penalty": 5,
+      "renover_penalty": 15,
+      "rdc_penalty": 8
+    },
+    "deal_breakers": {
+      "enabled": true,
+      "rules": [
+        {"condition": "surface < 12", "penalty": -25, "triggers_cap": true},
+        {"condition": "cout_minimum > valeur_prudente", "penalty": -15, "triggers_cap": true, "_comment": "mise_a_prix × 1.10 + travaux > valeur_prudente × 1.05 : pas d'affaire possible meme au minimum"},
+        {"condition": "occupation == inconnu", "penalty": -2, "triggers_cap": false}
+      ],
+      "score_cap": 50
+    },
+    "risk_adjustment": {
+      "_comment": "Decote de prudence appliquee si les fondamentaux sont incomplets ou a risque.",
+      "valeur_prudente_coeff": 0.85,
+      "apply_if": [
+        "etat_inconnu",
+        "travaux_non_documentes",
+        "ascenseur_inconnu_etage_eleve",
+        "bien_atypique"
+      ]
+    },
+    "uncertainty_penalty": {
+      "missing_fields": [
+        "etat",
+        "ascenseur",
+        "distribution",
+        "charges"
+      ],
+      "penalty_per_missing": -2,
+      "max_penalty": -8
+    },
+    "usage_penalty": {
+      "bureau": -20,
+      "commerce": -25
+    },
     "travaux_rules": {
+      "_comment": "Estimation travaux par defaut si le LLM ne fournit pas d'estimation. Base = % de la mise a prix.",
       "a_renover": {
         "minimum": 12000.0,
-        "ratio": 0.08
+        "ratio": 0.08,
+        "_comment": "Bien a renover : min 12k EUR ou 8% mise a prix"
       },
       "a_rafraichir": {
         "minimum": 6000.0,
-        "ratio": 0.04
+        "ratio": 0.04,
+        "_comment": "Rafraichissement : min 6k EUR ou 4% mise a prix"
       },
       "bon_etat": {
-        "ratio": 0.01
+        "ratio": 0.01,
+        "_comment": "Bon etat : 1% pour les imprevus"
       },
       "default": {
         "minimum_if_priced": 2500.0,
-        "ratio": 0.02
+        "ratio": 0.02,
+        "_comment": "Defaut : 2500 EUR min ou 2% si prix connu"
       }
     },
-    "price_ratio_scores": [
-      {
-        "max": 0.7,
-        "score": 100
-      },
-      {
-        "max": 0.78,
-        "score": 88
-      },
-      {
-        "max": 0.85,
-        "score": 67
-      },
-      {
-        "max": 0.92,
-        "score": 40
-      }
-    ],
-    "relative_m2_scores": [
-      {
-        "max": 0.7,
-        "score": 100
-      },
-      {
-        "max": 0.82,
-        "score": 85
-      },
-      {
-        "max": 0.95,
-        "score": 62
-      }
-    ],
     "liquidity": {
+      "_comment": "Score de liquidite : conserve pour affichage informatif uniquement, non utilise dans la ponderation principale.",
       "tension_transport": {
-        "paris": {
-          "tension": 98,
-          "transport": 95
-        },
-        "premium_near_paris": {
-          "tension": 84,
-          "transport": 88
-        },
-        "idf_core": {
-          "tension": 70,
-          "transport": 74
-        },
-        "other": {
-          "tension": 48,
-          "transport": 46
-        }
+        "paris": {"tension": 98, "transport": 95},
+        "premiere_couronne_liquide": {"tension": 93, "transport": 93},
+        "premiere_couronne_solide": {"tension": 84, "transport": 86},
+        "idf_core": {"tension": 74, "transport": 78},
+        "idf_outer": {"tension": 52, "transport": 56},
+        "other": {"tension": 40, "transport": 42}
       },
       "resale_weights": {
         "typology": 0.45,
         "surface": 0.35,
-        "location": 0.2
+        "location": 0.20
       },
       "global_weights": {
         "tension": 8,
@@ -174,20 +307,25 @@
       }
     },
     "occupation_scores": {
+      "_comment": "Impact du statut d'occupation sur le scoring",
       "libre": {
         "free_score": 100,
-        "risk_score": 95
+        "risk_score": 95,
+        "_comment": "Libre : ideal, pas de risque locataire"
       },
       "occupe": {
         "free_score": 30,
-        "risk_score": 25
+        "risk_score": 25,
+        "_comment": "Occupe : forte penalite, risque procedure + delai"
       },
       "default": {
         "free_score": 45,
-        "risk_score": 45
+        "risk_score": 45,
+        "_comment": "Inconnu : penalite moderee par prudence"
       }
     },
     "quality": {
+      "_comment": "Conserve pour compatibilite. Remplace par composition_scoring dans la ponderation.",
       "base": 55,
       "positive_step": 9,
       "negative_step": 12,
@@ -197,6 +335,7 @@
     },
     "strategic_bonus_rules": [
       {
+        "_comment": "Bonus maximum : studio parfait a Paris dans la surface cible absolue",
         "location": "paris",
         "target_typologies": ["STUDIO", "T1", "F1", "T2", "F2"],
         "surface_min": 18,
@@ -204,6 +343,7 @@
         "bonus": 10
       },
       {
+        "_comment": "Bonus fort : petit bien a Paris mais hors surface ideale",
         "location": "paris",
         "target_typologies": ["STUDIO", "T1", "F1", "T2", "F2"],
         "surface_min": 9,
@@ -211,23 +351,44 @@
         "bonus": 7
       },
       {
-        "location": "premium_near_paris",
+        "_comment": "Bonus modere : petit bien en zone premium proche Paris",
+        "location": "premiere_couronne_liquide",
+        "target_typologies": ["STUDIO", "T1", "F1", "T2", "F2"],
+        "surface_min": 18,
+        "surface_max": 30,
+        "bonus": 6
+      },
+      {
+        "_comment": "Bonus modere : petit bien en zone premium proche Paris hors coeur de cible",
+        "location": "premiere_couronne_liquide",
         "target_typologies": ["STUDIO", "T1", "F1", "T2", "F2"],
         "surface_min": 9,
         "surface_max": 35,
         "bonus": 4
+      },
+      {
+        "_comment": "Bonus leger : premiere couronne solide mais moins liquide que le top premium",
+        "location": "premiere_couronne_solide",
+        "target_typologies": ["STUDIO", "T1", "F1", "T2", "F2"],
+        "surface_min": 18,
+        "surface_max": 30,
+        "bonus": 3
       }
     ],
-    "score_weights": {
-      "cible": 0.35,
-      "prix": 0.25,
-      "liquidite": 0.2,
-      "occupation": 0.15,
-      "qualite": 0.05
-    },
     "prix_max_coefficients": {
-      "cible": 0.78,
-      "agressif": 0.7
+      "_comment": "Coefficients appliques a la valeur prudente pour calculer les prix cles",
+      "interessant": {
+        "coeff": 0.70,
+        "_comment": "Prix interessant : on vise 70% de la valeur prudente. Apres frais + travaux, marge nette >= 20%."
+      },
+      "palier": {
+        "coeff": 0.83,
+        "_comment": "Prix palier : on accepte jusqu'a 83% de la valeur prudente. Au-dessus, on laisse encherir les autres."
+      }
+    },
+    "prix_safe": {
+      "target_margin": 0.25,
+      "use_conservative_value": true
     }
   }
 }

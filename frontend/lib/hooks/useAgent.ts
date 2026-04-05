@@ -103,12 +103,12 @@ export function useAuctionAgentRunEvents(runId: number | null) {
   })
 }
 
-export function useAuctionListings(sourceCode: string | null) {
+export function useAuctionListings(sourceCode: string | null, visitWindowDays = 10) {
   return useQuery({
-    queryKey: ['auction-listings', sourceCode],
+    queryKey: ['auction-listings', sourceCode, visitWindowDays],
     queryFn: async () => {
       const response = await api.get<AuctionListing[]>('/api/auction-data/listings', {
-        params: { limit: 500 },
+        params: { limit: 500, actionable_only: true, visit_window_days: visitWindowDays },
       })
       return response.data
     },
