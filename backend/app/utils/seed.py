@@ -74,7 +74,11 @@ def seed_licitor_default_parameter_set(db: Session, definition: AgentDefinition)
         name="Configuration par défaut",
         version=1,
         is_default=True,
-        parameters_json={"session_urls": []},
+        parameters_json={
+            "session_urls": [
+                "https://www.licitor.com/ventes-aux-encheres-immobilieres/paris-et-ile-de-france/prochaines-ventes.html"
+            ]
+        },
     )
     db.add(parameter_set)
     print("[seed] AgentParameterSet default pour 'licitor_ingestion' créé.")
