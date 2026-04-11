@@ -1,3 +1,0 @@
-"""
-auction - Domaine agents auctions
-"""
