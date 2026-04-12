@@ -63,6 +63,11 @@ class Settings(BaseSettings):  # Configuration globale application chargée depu
     TWILIO_WHATSAPP_FROM: Optional[str] = None
     TWILIO_WHATSAPP_TO: Optional[str] = None
 
+    # LangSmith
+    LANGCHAIN_TRACING_V2: str = "false"
+    LANGSMITH_API_KEY: Optional[str] = None
+    LANGCHAIN_PROJECT: str = "meziane-licitor-dev"
+
     class Config:
         env_file = str(Path(__file__).parent.parent / ".env")
         case_sensitive = True

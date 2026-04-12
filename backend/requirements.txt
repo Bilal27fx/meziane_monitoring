@@ -18,9 +18,11 @@ httpx==0.25.2
 
 # AI & LLM
 anthropic==0.7.7
-openai==2.30.0
-langchain==0.0.340
-langgraph==0.0.20
+openai==1.51.0
+langchain-core==0.3.15
+langchain-openai==0.2.9
+langgraph==0.2.50
+langsmith==0.1.140
 
 # Data Processing
 pandas==2.1.3

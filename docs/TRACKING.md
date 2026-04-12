@@ -11,6 +11,7 @@ Lifecycle complet : `STANDARDS.md`
 | Nom | Description | Statut | Plan |
 |---|---|---|---|
 | Agent Licitor V3 | Extraction LLM-first — segmenteur + appel LLM + persist JSON extraction | Planifié | [plans/2026-04-04_agent-licitor-v3-llm-extraction.md](plans/2026-04-04_agent-licitor-v3-llm-extraction.md) |
+| Tests pipeline LangGraph | Tests d'intégration end-to-end avec URLs Licitor réelles | Planifié | — |
 
 ---
 
@@ -27,6 +28,7 @@ Lifecycle complet : `STANDARDS.md`
 
 | Nom | Description | Date | Refactor doc |
 |---|---|---|---|
+| Pipeline LangGraph agents | HERMES+ARCHIVIO+MERCATO+ORACLE+PERSIST — graphe complet + task Celery | 2026-04-12 | [refactors/2026-04-12_langgraph-agents-implementation.md](refactors/2026-04-12_langgraph-agents-implementation.md) |
 | Refonte scoring prix v2 | Score prix sur mise à prix réelle/m² vs marché, 5 dimensions indépendantes, deal_breakers corrigés | 2026-04-05 | [refactors/2026-04-05_scoring-prix-refonte.md](refactors/2026-04-05_scoring-prix-refonte.md) |
 | Fix extraction Licitor | Date enchère + lieu visite manquants — 6 bugs corrigés | 2026-04-04 | [refactors/2026-04-04_licitor-extraction-fix.md](refactors/2026-04-04_licitor-extraction-fix.md) |
 | Agent Licitor V2 | URLs backend + scoring LLM post-ingestion | 2026-04-03 | [refactors/2026-04-03_agent-licitor-v2.md](refactors/2026-04-03_agent-licitor-v2.md) |

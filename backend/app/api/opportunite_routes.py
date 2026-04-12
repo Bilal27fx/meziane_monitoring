@@ -26,7 +26,6 @@ from app.schemas.opportunite_schema import (
     StatutOpportunite
 )
 from app.models.opportunite import Opportunite
-from app.agents.agent_prospection import AgentProspection
 from app.utils.db import get_db
 from app.utils.logger import setup_logger
 from app.utils.auth import get_current_user
@@ -166,22 +165,8 @@ def delete_opportunite(opportunite_id: int, db: Session = Depends(get_db)):  # S
 async def run_agent(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
-):  # Lance agent prospection manuellement
-    logger.info("🚀 Lancement manuel agent prospection...")
-
-    try:
-        agent = AgentProspection(db)
-        resultats = await agent.run()
-
-        return {
-            "status": "success",
-            "message": f"Agent terminé: {resultats['total_sauvegardees']} opportunités sauvegardées",
-            "resultats": resultats
-        }
-
-    except Exception as e:
-        logger.error(f"Erreur lancement agent: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur agent: {str(e)}"
-        )
+):  # Redirige vers le nouveau pipeline LangGraph (POST /auction/agent/run)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Agent prospection V1 supprimé. Utiliser POST /auction/agent/run (pipeline LangGraph)."
+    )
